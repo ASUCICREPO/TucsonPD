@@ -1,0 +1,20 @@
+#Ignore frontend node modules
+/frontend/node_modules/
+
+
+
+
+#Ignore development python .venv files
+/backend/lambdas/bedrock_lambda/.venv
+/backend/lambdas/database_management_lambda/.venv
+/backend/.venv
+
+#Ignore IAC typeScript files
+/backend/*.js
+/backend/!jest.config.js
+/backend/*.d.ts
+/backend/node_modules
+
+# CDK asset staging directory
+/.cdk.staging
+/backend/cdk.out
