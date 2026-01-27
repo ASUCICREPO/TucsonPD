@@ -6,6 +6,8 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
+const BEDROCK_MODEL_ID = 'us.meta.llama3-3-70b-instruct-v1:0';
+
 export class backendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -111,7 +113,7 @@ export class backendStack extends cdk.Stack {
     const bedrockLambda = new lambda.Function(this, 'BedrockLambda', {
       functionName: 'TucsonPD-BedrockLambda',
       runtime: lambda.Runtime.PYTHON_3_12,
-      handler: 'lambda_handler.lambda_handler',
+      handler: 'lambda_function.lambda_handler',
       code: lambda.Code.fromAsset('./lambdas/bedrock_lambda'),
       timeout: cdk.Duration.seconds(360), // 6 minutes
       memorySize: 1024,
@@ -120,7 +122,7 @@ export class backendStack extends cdk.Stack {
         S3_BUCKET_NAME: redactionBucket.bucketName,
         DYNAMODB_TABLE_NAME: casesTable.tableName,
         DYNAMODB_GUIDELINES_TABLE_NAME: guidelinesTable.tableName,
-        BEDROCK_MODEL_ID: 'meta.llama3-70b-instruct-v1:0',
+        BEDROCK_MODEL_ID: BEDROCK_MODEL_ID,
       },
     });
 
@@ -129,14 +131,25 @@ export class backendStack extends cdk.Stack {
     guidelinesTable.grantReadWriteData(bedrockLambda);
     redactionBucket.grantReadWrite(bedrockLambda);
 
-    // Grant Bedrock API access
+    // Grant Bedrock API access - Full access
     bedrockLambda.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ['bedrock:InvokeModel'],
-        resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/meta.llama3-70b-instruct-v1:0`,
+        actions: ['bedrock:*'],
+        resources: ['*'],
+      })
+    );
+
+    // Grant AWS Textract permissions for document text extraction
+    bedrockLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'textract:DetectDocumentText',
+          'textract:StartDocumentTextDetection',
+          'textract:GetDocumentTextDetection',
         ],
+        resources: ['*'],
       })
     );
 
@@ -208,7 +221,8 @@ export class backendStack extends cdk.Stack {
 
     // /cases/{case_id}
     const caseIdResource = casesResource.addResource('{case_id}');
-    caseIdResource.addMethod('GET', databaseIntegration); // Get case
+    caseIdResource.addMethod('GET', databaseIntegration);    // Get case
+    caseIdResource.addMethod('DELETE', databaseIntegration); // Delete case
 
     // /cases/{case_id}/status
     const caseStatusResource = caseIdResource.addResource('status');

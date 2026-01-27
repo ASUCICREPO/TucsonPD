@@ -228,6 +228,31 @@ def query_dynamodb_by_index(
         raise
 
 
+def delete_dynamodb_item(case_id: str) -> None:
+    """
+    Delete a case item from DynamoDB
+    
+    Args:
+        case_id: Unique case identifier
+        
+    Raises:
+        ClientError: If DynamoDB operation fails
+    """
+    logger.info(f"Deleting DynamoDB item: {case_id}")
+    
+    try:
+        dynamodb_table.delete_item(Key={'case_id': case_id})
+        logger.info(f"Successfully deleted DynamoDB item: {case_id}")
+        
+    except ClientError as e:
+        logger.error(f"Failed to delete DynamoDB item: {case_id}")
+        logger.error(f"Error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error deleting DynamoDB item: {e}")
+        raise
+
+
 # ============================================================================
 # DYNAMODB FUNCTIONS - GUIDELINES
 # ============================================================================
@@ -633,6 +658,46 @@ def download_from_s3(bucket: str, key: str) -> bytes:
         raise
     except Exception as e:
         logger.error(f"Unexpected error downloading from S3: {e}")
+        raise
+
+
+def delete_s3_object(s3_path: str) -> None:
+    """
+    Delete an object from S3
+    
+    Args:
+        s3_path: Full S3 path (e.g., 's3://bucket/key' or just 'key')
+        
+    Raises:
+        ClientError: If S3 deletion fails
+        ValueError: If s3_path is invalid
+    """
+    logger.info(f"Deleting S3 object: {s3_path}")
+    
+    try:
+        # Parse S3 path
+        if s3_path.startswith('s3://'):
+            # Extract bucket and key from s3://bucket/key format
+            path_parts = s3_path.replace('s3://', '').split('/', 1)
+            if len(path_parts) != 2:
+                raise ValueError(f"Invalid S3 path format: {s3_path}")
+            bucket, key = path_parts
+        else:
+            # Assume it's just a key and use the default bucket
+            bucket = S3_BUCKET_NAME
+            key = s3_path
+        
+        # Delete the object
+        s3_client.delete_object(Bucket=bucket, Key=key)
+        
+        logger.info(f"Successfully deleted s3://{bucket}/{key}")
+        
+    except ClientError as e:
+        logger.error(f"Failed to delete S3 object: {s3_path}")
+        logger.error(f"Error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error deleting S3 object: {e}")
         raise
 
 

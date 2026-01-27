@@ -128,7 +128,7 @@ def list_cases(
     List cases for an officer, optionally filtered by status
     
     Args:
-        officer_id: Cognito user ID to filter by
+        officer_id: Cognito user ID to filter by (as string)
         status: Optional status filter
         limit: Maximum number of cases to return
         
@@ -139,6 +139,9 @@ def list_cases(
         Exception: If DynamoDB query fails
     """
     logger.info(f"Listing cases for officer: {officer_id}, status: {status}, limit: {limit}")
+    
+    # Ensure officer_id is a string
+    officer_id = str(officer_id)
     
     try:
         if status:
@@ -283,6 +286,51 @@ def update_case_s3_path(
         raise
     except Exception as e:
         logger.error(f"Failed to update S3 path: {str(e)}", exc_info=True)
+        raise
+
+
+def delete_case(case_id: str) -> None:
+    """
+    Delete a case and its associated S3 files
+    
+    Args:
+        case_id: Unique case identifier
+        
+    Raises:
+        ValueError: If case not found
+        Exception: If deletion fails
+    """
+    logger.info(f"Deleting case: {case_id}")
+    
+    try:
+        # Verify case exists before deleting
+        case = get_case(case_id)
+        
+        # Delete S3 files associated with the case
+        s3_paths = case.get('s3_paths', {})
+        deleted_files = []
+        
+        for path_type, s3_path in s3_paths.items():
+            if s3_path:
+                try:
+                    from utils import delete_s3_object
+                    delete_s3_object(s3_path)
+                    deleted_files.append(path_type)
+                    logger.info(f"Deleted S3 file: {path_type} ({s3_path})")
+                except Exception as e:
+                    logger.warning(f"Failed to delete S3 file {path_type}: {str(e)}")
+                    # Continue deleting other files even if one fails
+        
+        # Delete the case from DynamoDB
+        from utils import delete_dynamodb_item
+        delete_dynamodb_item(case_id)
+        
+        logger.info(f"Successfully deleted case: {case_id} (deleted {len(deleted_files)} S3 files)")
+        
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete case {case_id}: {str(e)}", exc_info=True)
         raise
 
 

@@ -13,6 +13,7 @@ API Endpoints:
 - GET    /cases                          → List cases (filtered by officer_id or status)
 - PUT    /cases/{case_id}/status         → Update case status (may trigger Bedrock Lambda)
 - PUT    /cases/{case_id}/s3-path        → Update S3 path for uploaded file
+- DELETE /cases/{case_id}                → Delete case
 - POST   /presigned-url/upload           → Generate pre-signed upload URL
 - POST   /presigned-url/download         → Generate pre-signed download URL
 - POST   /guidelines/upload              → Get pre-signed URL for guidelines PDF upload (admin)
@@ -33,7 +34,8 @@ from case_management import (
     get_case,
     list_cases,
     update_case_status,
-    update_case_s3_path
+    update_case_s3_path,
+    delete_case
 )
 from presigned_urls import (
     generate_upload_url,
@@ -77,11 +79,24 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         query_parameters = event.get('queryStringParameters') or {}
         
         # Extract officer_id from authorizer context (Cognito)
-        # Assumes API Gateway has Cognito authorizer configured
+        # For testing: fallback to request body if no Cognito TODO Fix this for actual auth
         authorizer_claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})
-        officer_id = authorizer_claims.get('sub')  # Cognito user ID
+        officer_id = authorizer_claims.get('sub')
         officer_name = authorizer_claims.get('name', 'Unknown Officer')
         is_admin = 'admin' in authorizer_claims.get('cognito:groups', '').lower()
+
+        # TESTING FALLBACK: If no Cognito, read from request body
+        if not officer_id:
+            try:
+                body = parse_request_body(event) if event.get('body') else {}
+                officer_id = body.get('officer_id', 'test-officer-123')
+                officer_name = body.get('officer_name', 'Test Officer')
+                is_admin = body.get('is_admin', False)
+                logger.info(f"Using officer_id from request body (testing mode): {officer_id}")
+            except:
+                # If parsing fails, use defaults
+                officer_id = 'test-officer-123'
+                officer_name = 'Test Officer'
         
         logger.info(f"Request: {http_method} {path}")
         logger.info(f"Officer ID: {officer_id}, Is Admin: {is_admin}")
@@ -116,6 +131,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             case_id = path_parameters['case_id']
             body = parse_request_body(event)
             return handle_update_s3_path(case_id, body, officer_id)
+        
+        # DELETE /cases/{case_id} - Delete case
+        elif http_method == 'DELETE' and path.startswith('/cases/') and path_parameters.get('case_id'):
+            case_id = path_parameters['case_id']
+            return handle_delete_case(case_id, officer_id)
         
         # POST /presigned-url/upload - Generate upload URL
         elif http_method == 'POST' and path == '/presigned-url/upload':
@@ -345,6 +365,25 @@ def handle_generate_download_url(body: Dict[str, Any], officer_id: str) -> Dict[
     return build_api_response(200, {
         "success": True,
         "download_url": download_url
+    })
+
+
+def handle_delete_case(case_id: str, officer_id: str) -> Dict[str, Any]:
+    """Handle DELETE /cases/{case_id} - Delete case"""
+    logger.info(f"Deleting case: {case_id}")
+    
+    # Verify officer owns this case
+    case = get_case(case_id)
+    if case['officer_id'] != officer_id:
+        raise PermissionError("You do not have permission to delete this case")
+    
+    # Delete the case
+    delete_case(case_id)
+    
+    return build_api_response(200, {
+        "success": True,
+        "message": "Case deleted successfully",
+        "case_id": case_id
     })
 
 

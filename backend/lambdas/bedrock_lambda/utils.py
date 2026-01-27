@@ -389,6 +389,53 @@ def update_guidelines_error(
         raise
 
 
+def get_active_guideline_from_db() -> Optional[Dict[str, Any]]:
+    """
+    Get the currently active guideline from DynamoDB
+    
+    Returns:
+        Active guideline item if found, None otherwise
+        
+    Raises:
+        ClientError: If DynamoDB scan fails
+    """
+    logger.info("Querying for active guideline from DynamoDB")
+    
+    try:
+        # Scan for active guideline (in production, consider using a GSI for better performance)
+        response = guidelines_table.scan(
+            FilterExpression='#status = :active',
+            ExpressionAttributeNames={
+                '#status': 'status'
+            },
+            ExpressionAttributeValues={
+                ':active': 'active'
+            }
+        )
+        
+        items = response.get('Items', [])
+        
+        if not items:
+            logger.warning("No active guideline found in DynamoDB")
+            return None
+        
+        if len(items) > 1:
+            logger.warning(f"Multiple active guidelines found ({len(items)}). Using the first one.")
+        
+        active_guideline = items[0]
+        logger.info(f"Found active guideline: {active_guideline['guideline_id']}")
+        
+        return active_guideline
+        
+    except ClientError as e:
+        logger.error(f"Failed to query for active guideline")
+        logger.error(f"Error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error querying for active guideline: {e}")
+        raise
+
+
 # ============================================================================
 # BEDROCK FUNCTIONS
 # ============================================================================

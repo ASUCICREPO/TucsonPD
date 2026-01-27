@@ -47,7 +47,7 @@ if not DYNAMODB_GUIDELINES_TABLE_NAME:
     raise ValueError("DYNAMODB_GUIDELINES_TABLE_NAME environment variable is required")
 
 # AWS Region
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
 
 
 # ============================================================================
@@ -96,7 +96,7 @@ GUIDELINE_PROCESSING_FAILED = "failed"          # Conversion failed
 # ============================================================================
 
 # Default Bedrock model ID (can be overridden by environment variable)
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "meta.llama3-70b-instruct-v1:0")
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "us.meta.llama3-3-70b-instruct-v1:0")
 
 
 # ============================================================================

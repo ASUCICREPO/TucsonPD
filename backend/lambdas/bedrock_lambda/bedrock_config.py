@@ -13,6 +13,7 @@ from prompts import (
     guidelines_conversion,
     error
 )
+from constants import BEDROCK_MODEL_ID
 import constants  # This configures logging
 
 logger = logging.getLogger(__name__)
@@ -23,16 +24,16 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 # Model ID for document summary generation
-document_summary_id = "meta.llama3-70b-instruct-v1:0"
+document_summary_id = BEDROCK_MODEL_ID
 
 # Model ID for page-by-page redaction analysis
-page_analysis_id = "meta.llama3-70b-instruct-v1:0"
+page_analysis_id = BEDROCK_MODEL_ID
 
 # Model ID for guidelines PDF to JSON conversion
-guidelines_conversion_id = "meta.llama3-70b-instruct-v1:0"
+guidelines_conversion_id = BEDROCK_MODEL_ID
 
 # Model ID for error handling (default case)
-error_id = "meta.llama3-70b-instruct-v1:0"
+error_id = BEDROCK_MODEL_ID
 
 
 # ============================================================================
@@ -73,7 +74,7 @@ default_max_tokens = 4096
 # RETRIEVAL FUNCTIONS
 # ============================================================================
 
-def get_prompt(type, page_text=None, guidelines=None, document_summary=None, page_number=None, guidelines_text=None):
+def get_prompt(type, page_text=None, guidelines=None, doc_summary=None, page_number=None, guidelines_text=None):
     """
     Returns the appropriate system prompt based on the specified type.
     Formats prompts with provided parameters for Bedrock model consumption.
@@ -82,7 +83,7 @@ def get_prompt(type, page_text=None, guidelines=None, document_summary=None, pag
         type: Type of prompt to retrieve ("document_summary", "page_analysis", "guidelines_conversion", "error")
         page_text: Full text content of a single page (for page_analysis)
         guidelines: JSON string of redaction guidelines (for page_analysis)
-        document_summary: Summary of entire document (for page_analysis context)
+        doc_summary: Summary of entire document (for page_analysis context)
         page_number: Current page number being analyzed (for page_analysis)
         guidelines_text: Full text of guidelines PDF (for guidelines_conversion)
     
@@ -115,7 +116,7 @@ def get_prompt(type, page_text=None, guidelines=None, document_summary=None, pag
                 prompt = page_analysis.page_analysis_prompt.format(
                     page_text=page_text,
                     guidelines=guidelines,
-                    document_summary=document_summary or "No document summary available",
+                    document_summary=doc_summary or "No document summary available",
                     page_number=page_number
                 )
                 
