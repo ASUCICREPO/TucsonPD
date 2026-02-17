@@ -1,0 +1,2975 @@
+{
+  "version": "48.0.0",
+  "artifacts": {
+    "TucsonPdBackendStack.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "TucsonPdBackendStack.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "TucsonPdBackendStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/unknown-region",
+      "properties": {
+        "templateFile": "TucsonPdBackendStack.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/3eca8444918d99b85e2e8322a1bf7bff977a50727dd16a3ca966d7bf44ae6a99.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "TucsonPdBackendStack.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-${AWS::Region}",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "TucsonPdBackendStack.assets"
+      ],
+      "metadata": {
+        "/TucsonPdBackendStack/CasesTable": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "partitionKey": {
+                "name": "*",
+                "type": "S"
+              },
+              "billingMode": "PAY_PER_REQUEST",
+              "pointInTimeRecovery": false,
+              "removalPolicy": "destroy",
+              "tableName": "*"
+            }
+          },
+          {
+            "type": "aws:cdk:hasPhysicalName",
+            "data": {
+              "Ref": "CasesTableABF7127D"
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addGlobalSecondaryIndex": [
+                {
+                  "indexName": "*",
+                  "projectionType": "ALL",
+                  "partitionKey": {
+                    "name": "*",
+                    "type": "S"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addGlobalSecondaryIndex": [
+                {
+                  "indexName": "*",
+                  "projectionType": "ALL",
+                  "partitionKey": {
+                    "name": "*",
+                    "type": "S"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/CasesTable/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CasesTableABF7127D"
+          }
+        ],
+        "/TucsonPdBackendStack/CasesTable/ScalingRole": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          }
+        ],
+        "/TucsonPdBackendStack/GuidelinesTable": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "partitionKey": {
+                "name": "*",
+                "type": "S"
+              },
+              "billingMode": "PAY_PER_REQUEST",
+              "pointInTimeRecovery": false,
+              "removalPolicy": "destroy",
+              "tableName": "*"
+            }
+          },
+          {
+            "type": "aws:cdk:hasPhysicalName",
+            "data": {
+              "Ref": "GuidelinesTable52F2F85C"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/GuidelinesTable/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GuidelinesTable52F2F85C"
+          }
+        ],
+        "/TucsonPdBackendStack/GuidelinesTable/ScalingRole": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionBucket": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "autoDeleteObjects": true,
+              "blockPublicAccess": "*",
+              "cors": [
+                {
+                  "allowedMethods": [
+                    "GET",
+                    "PUT",
+                    "POST"
+                  ],
+                  "allowedOrigins": "*",
+                  "allowedHeaders": "*",
+                  "exposedHeaders": "*",
+                  "maxAge": "*"
+                }
+              ],
+              "encryption": "S3_MANAGED",
+              "removalPolicy": "destroy",
+              "versioned": true
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addCorsRule": [
+                {
+                  "allowedMethods": [
+                    "GET",
+                    "PUT",
+                    "POST"
+                  ],
+                  "allowedOrigins": "*",
+                  "allowedHeaders": "*",
+                  "exposedHeaders": "*",
+                  "maxAge": "*"
+                },
+                "*",
+                "*"
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionBucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionBucket98A3E28A"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionBucket/Policy": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "bucket": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionBucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionBucketPolicy3A5443FD"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionBucket/AutoDeleteObjectsCustomResource": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionBucket/AutoDeleteObjectsCustomResource/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionBucketAutoDeleteObjectsCustomResource3CB9D125"
+          }
+        ],
+        "/TucsonPdBackendStack/Custom::S3AutoDeleteObjectsCustomResourceProvider": [
+          {
+            "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
+            "data": true
+          }
+        ],
+        "/TucsonPdBackendStack/Custom::S3AutoDeleteObjectsCustomResourceProvider/Role": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+          }
+        ],
+        "/TucsonPdBackendStack/Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F"
+          }
+        ],
+        "/TucsonPdBackendStack/PdfProcessingLayer": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "description": "*",
+              "code": "*",
+              "compatibleRuntimes": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/PdfProcessingLayer/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PdfProcessingLayer736F2CE6"
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "description": "*",
+              "environment": "*",
+              "layers": [
+                "*"
+              ],
+              "memorySize": "*",
+              "timeout": "*",
+              "code": "*",
+              "handler": "*",
+              "runtime": "*"
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addLayers": [
+                "*"
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/ServiceRole": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "assumedBy": {
+                "principalAccount": "*",
+                "assumeRoleAction": "*"
+              },
+              "managedPolicies": [
+                {
+                  "managedPolicyArn": "*"
+                }
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachInlinePolicy": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachInlinePolicy": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/ServiceRole/ImportServiceRole": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/ServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BedrockLambdaServiceRoleE2062991"
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/ServiceRole/DefaultPolicy": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachToRole": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachToRole": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/ServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BedrockLambdaServiceRoleDefaultPolicyD8608AE4"
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BedrockLambdaC6729693"
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/LogGroup": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "logGroupName": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/BedrockLambda/LogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BedrockLambdaLogGroup92CF80B9"
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "description": "*",
+              "environment": "*",
+              "memorySize": "*",
+              "timeout": "*",
+              "code": "*",
+              "handler": "*",
+              "runtime": "*"
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addEnvironment": [
+                "*",
+                "*"
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/ServiceRole": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "assumedBy": {
+                "principalAccount": "*",
+                "assumeRoleAction": "*"
+              },
+              "managedPolicies": [
+                {
+                  "managedPolicyArn": "*"
+                }
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachInlinePolicy": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachInlinePolicy": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToPrincipalPolicy": [
+                {}
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/ServiceRole/ImportServiceRole": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/ServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseLambdaServiceRoleA0D9D48F"
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/ServiceRole/DefaultPolicy": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachToRole": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "attachToRole": [
+                "*"
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addStatements": [
+                {}
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/ServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseLambdaServiceRoleDefaultPolicyAC2D5EF4"
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseLambda78D2905C"
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/LogGroup": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "logGroupName": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/DatabaseLambda/LogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseLambdaLogGroup9D056996"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "defaultCorsPreflightOptions": {
+                "allowOrigins": "*",
+                "allowHeaders": "*",
+                "allowMethods": "*"
+              },
+              "deployOptions": {
+                "throttlingBurstLimit": "*",
+                "throttlingRateLimit": "*",
+                "stageName": "*"
+              },
+              "description": "*",
+              "restApiName": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApi07E20785"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Deployment": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "description": "*",
+              "api": "*",
+              "retainDeployments": "*"
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addToLogicalId": [
+                {}
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Deployment/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiDeployment2949237D4594e3ad201ba26f3255b0ec2c33ccea"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/DeploymentStage.prod": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "deployment": "*",
+              "throttlingBurstLimit": "*",
+              "throttlingRateLimit": "*",
+              "stageName": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/DeploymentStage.prod/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiDeploymentStageprodE98E85D4"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Endpoint": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiEndpointE64F25AA"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": "*"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiOPTIONSB7E2DFA0"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicases36722D28"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasesOPTIONS30B33CCC"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/POST": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..cases": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasesPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTcases512B4CD1"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..cases": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasesPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTcases7FB95C2C"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/POST/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasesPOST923C110B"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/GET": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..cases": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasesGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETcases0A6BCE61"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..cases": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasesGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETcases177FA6C5"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/GET/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasesGETC57B8DFF"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseid6018DA2F"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidOPTIONS2D71B856"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/GET": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..cases.{case_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETcasescaseid35FE9BB0"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..cases.{case_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETcasescaseid1883AD56"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/GET/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidGETCD3019D9"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/DELETE": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/DELETE/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.DELETE..cases.{case_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidDELETEApiPermissionTucsonPdBackendStackRedactionApiF105C143DELETEcasescaseid4D561129"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/DELETE/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.DELETE..cases.{case_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidDELETEApiPermissionTestTucsonPdBackendStackRedactionApiF105C143DELETEcasescaseid7157979A"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/DELETE/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidDELETEF29E1281"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidstatus1E86EFE5"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidstatusOPTIONSC27A6C92"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/PUT": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.status": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidstatusPUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTcasescaseidstatus1CD11738"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.status": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidstatusPUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTcasescaseidstatus496B11CD"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/PUT/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseidstatusPUT0688373D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseids3path6BA50E2E"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseids3pathOPTIONS6585B891"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/PUT": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.s3-path": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseids3pathPUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTcasescaseids3path322B20CD"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.s3-path": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseids3pathPUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTcasescaseids3path9B7685A9"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/PUT/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApicasescaseids3pathPUT0308355D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurl591F293C"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurlOPTIONS089404FB"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurlupload7F3FE4D5"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurluploadOPTIONS742DFADC"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/POST": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.upload": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurluploadPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTpresignedurluploadC46F9E5D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.upload": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurluploadPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTpresignedurluploadAC3C0C2D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/POST/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurluploadPOST587C4EE0"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurldownload1F709854"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurldownloadOPTIONS85DCB48A"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/POST": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.download": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurldownloadPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTpresignedurldownload67946D0D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.download": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurldownloadPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTpresignedurldownload9E85B5BA"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/POST/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApipresignedurldownloadPOST006A6308"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelines42CF6076"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesOPTIONS88217042"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesuploadC999045D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesuploadOPTIONS34EB648F"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/POST": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.upload": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesuploadPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTguidelinesuploadC345E081"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.upload": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesuploadPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTguidelinesupload38AAADEB"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/POST/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesuploadPOST6A131FF1"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesallED91F518"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesallOPTIONSF9961F83"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all/GET": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.all": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesallGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETguidelinesall5018BB80"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.all": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesallGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETguidelinesall11B162E6"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/all/GET/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesallGETBC287C8A"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesactiveB723A5BF"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesactiveOPTIONS1FDDC08E"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active/GET": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.active": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesactiveGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETguidelinesactive1BC04FE6"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.active": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesactiveGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETguidelinesactive8314B804"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/active/GET/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesactiveGETDBBDC7D2"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineid459A3E95"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidOPTIONS97269DB0"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/PUT": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidPUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineid1CC44872"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidPUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineid3500638A"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/PUT/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidPUT862A923D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/DELETE": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/DELETE/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.DELETE..guidelines.{guideline_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidDELETEApiPermissionTucsonPdBackendStackRedactionApiF105C143DELETEguidelinesguidelineid7ADA85D2"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/DELETE/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.DELETE..guidelines.{guideline_id}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidDELETEApiPermissionTestTucsonPdBackendStackRedactionApiF105C143DELETEguidelinesguidelineid0BE7A208"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/DELETE/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidDELETE3A639DDD"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidprocess91D19E95"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidprocessOPTIONSC2771BE9"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/POST": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.{guideline_id}.process": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidprocessPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTguidelinesguidelineidprocessF2931CDC"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.{guideline_id}.process": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidprocessPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTguidelinesguidelineidprocessE080FF47"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/POST/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidprocessPOST65A713A0"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "parent": "*",
+              "pathPart": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidactivate2CF4FAD1"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/OPTIONS": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": {
+                "authorizer": {
+                  "authorizerId": "*",
+                  "authorizationType": "*"
+                },
+                "apiKeyRequired": false,
+                "authorizationType": "*",
+                "methodResponses": [
+                  {
+                    "statusCode": "*",
+                    "responseParameters": "*"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "aws:cdk:analytics:method",
+            "data": {
+              "addMethodResponse": [
+                {
+                  "statusCode": "*",
+                  "responseParameters": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidactivateOPTIONSBC39A93A"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/PUT": [
+          {
+            "type": "aws:cdk:analytics:construct",
+            "data": {
+              "resource": "*",
+              "httpMethod": "*",
+              "integration": "*",
+              "options": "*"
+            }
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}.activate": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidactivatePUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineidactivateE3191EA0"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}.activate": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidactivatePUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineidactivateB223999D"
+          }
+        ],
+        "/TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/PUT/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "RedactionApiguidelinesguidelineidactivatePUT9BEE1FF8"
+          }
+        ],
+        "/TucsonPdBackendStack/s3-bucket-name": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "s3bucketname"
+          }
+        ],
+        "/TucsonPdBackendStack/cases-table-name": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "casestablename"
+          }
+        ],
+        "/TucsonPdBackendStack/guidelines-table-name": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "guidelinestablename"
+          }
+        ],
+        "/TucsonPdBackendStack/database-lambda-name": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "databaselambdaname"
+          }
+        ],
+        "/TucsonPdBackendStack/bedrock-lambda-name": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "bedrocklambdaname"
+          }
+        ],
+        "/TucsonPdBackendStack/api-gateway-url": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "apigatewayurl"
+          }
+        ],
+        "/TucsonPdBackendStack/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/TucsonPdBackendStack/CDKMetadata/Condition": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadataAvailable"
+          }
+        ],
+        "/TucsonPdBackendStack/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/TucsonPdBackendStack/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "TucsonPdBackendStack"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    },
+    "aws-cdk-lib/feature-flag-report": {
+      "type": "cdk:feature-flag-report",
+      "properties": {
+        "module": "aws-cdk-lib",
+        "flags": {
+          "@aws-cdk/core:enableStackNameDuplicates": {
+            "recommendedValue": true,
+            "explanation": "Allow multiple stacks with the same name",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "aws-cdk:enableDiffNoFail": {
+            "recommendedValue": true,
+            "explanation": "Make `cdk diff` not fail when there are differences",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/core:newStyleStackSynthesis": {
+            "recommendedValue": true,
+            "explanation": "Switch to new stack synthesis method which enables CI/CD",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/core:stackRelativeExports": {
+            "recommendedValue": true,
+            "explanation": "Name exports based on the construct paths relative to the stack, rather than the global construct path",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-ecr-assets:dockerIgnoreSupport": {
+            "recommendedValue": true,
+            "explanation": "DockerImageAsset properly supports `.dockerignore` files by default",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-secretsmanager:parseOwnedSecretName": {
+            "recommendedValue": true,
+            "explanation": "Fix the referencing of SecretsManager names from ARNs",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-kms:defaultKeyPolicies": {
+            "recommendedValue": true,
+            "explanation": "Tighten default KMS key policies",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-s3:grantWriteWithoutAcl": {
+            "recommendedValue": true,
+            "explanation": "Remove `PutObjectAcl` from Bucket.grantWrite",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-ecs-patterns:removeDefaultDesiredCount": {
+            "recommendedValue": true,
+            "explanation": "Do not specify a default DesiredCount for ECS services",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-rds:lowercaseDbIdentifier": {
+            "recommendedValue": true,
+            "explanation": "Force lowercasing of RDS Cluster names in CDK",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": {
+            "recommendedValue": true,
+            "explanation": "Allow adding/removing multiple UsagePlanKeys independently",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-efs:defaultEncryptionAtRest": {
+            "recommendedValue": true,
+            "explanation": "Enable this feature flag to have elastic file systems encrypted at rest by default.",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-lambda:recognizeVersionProps": {
+            "recommendedValue": true,
+            "explanation": "Enable this feature flag to opt in to the updated logical id calculation for Lambda Version created using the  `fn.currentVersion`.",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-lambda:recognizeLayerVersion": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enable this feature flag to opt in to the updated logical id calculation for Lambda Version created using the `fn.currentVersion`."
+          },
+          "@aws-cdk/aws-cloudfront:defaultSecurityPolicyTLSv1.2_2021": {
+            "recommendedValue": true,
+            "explanation": "Enable this feature flag to have cloudfront distributions use the security policy TLSv1.2_2021 by default.",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/core:checkSecretUsage": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enable this flag to make it impossible to accidentally use SecretValues in unsafe locations"
+          },
+          "@aws-cdk/core:target-partitions": {
+            "userValue": [
+              "aws",
+              "aws-cn"
+            ],
+            "recommendedValue": [
+              "aws",
+              "aws-cn"
+            ],
+            "explanation": "What regions to include in lookup tables of environment agnostic stacks"
+          },
+          "@aws-cdk-containers/ecs-service-extensions:enableDefaultLogDriver": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "ECS extensions will automatically add an `awslogs` driver if no logging is specified"
+          },
+          "@aws-cdk/aws-ec2:uniqueImdsv2TemplateName": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enable this feature flag to have Launch Templates generated by the `InstanceRequireImdsv2Aspect` use unique names."
+          },
+          "@aws-cdk/aws-ecs:arnFormatIncludesClusterName": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "ARN format used by ECS. In the new ARN format, the cluster name is part of the resource ID."
+          },
+          "@aws-cdk/aws-iam:minimizePolicies": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Minimize IAM policies by combining Statements"
+          },
+          "@aws-cdk/core:validateSnapshotRemovalPolicy": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Error on snapshot removal policies on resources that do not support it."
+          },
+          "@aws-cdk/aws-codepipeline:crossAccountKeyAliasStackSafeResourceName": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Generate key aliases that include the stack name"
+          },
+          "@aws-cdk/aws-s3:createDefaultLoggingPolicy": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enable this feature flag to create an S3 bucket policy by default in cases where an AWS service would automatically create the Policy if one does not exist."
+          },
+          "@aws-cdk/aws-sns-subscriptions:restrictSqsDescryption": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Restrict KMS key policy for encrypted Queues a bit more"
+          },
+          "@aws-cdk/aws-apigateway:disableCloudWatchRole": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Make default CloudWatch Role behavior safe for multiple API Gateways in one environment"
+          },
+          "@aws-cdk/core:enablePartitionLiterals": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Make ARNs concrete if AWS partition is known"
+          },
+          "@aws-cdk/aws-events:eventsTargetQueueSameAccount": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Event Rules may only push to encrypted SQS queues in the same account"
+          },
+          "@aws-cdk/aws-ecs:disableExplicitDeploymentControllerForCircuitBreaker": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Avoid setting the \"ECS\" deployment controller when adding a circuit breaker"
+          },
+          "@aws-cdk/aws-iam:importedRoleStackSafeDefaultPolicyName": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enable this feature to by default create default policy names for imported roles that depend on the stack the role is in."
+          },
+          "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Use S3 Bucket Policy instead of ACLs for Server Access Logging"
+          },
+          "@aws-cdk/aws-route53-patters:useCertificate": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Use the official `Certificate` resource instead of `DnsValidatedCertificate`"
+          },
+          "@aws-cdk/customresources:installLatestAwsSdkDefault": {
+            "userValue": false,
+            "recommendedValue": false,
+            "explanation": "Whether to install the latest SDK by default in AwsCustomResource"
+          },
+          "@aws-cdk/aws-rds:databaseProxyUniqueResourceName": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Use unique resource name for Database Proxy"
+          },
+          "@aws-cdk/aws-codedeploy:removeAlarmsFromDeploymentGroup": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Remove CloudWatch alarms from deployment group"
+          },
+          "@aws-cdk/aws-apigateway:authorizerChangeDeploymentLogicalId": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Include authorizer configuration in the calculation of the API deployment logical ID."
+          },
+          "@aws-cdk/aws-ec2:launchTemplateDefaultUserData": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Define user data for a launch template by default when a machine image is provided."
+          },
+          "@aws-cdk/aws-secretsmanager:useAttachedSecretResourcePolicyForSecretTargetAttachments": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "SecretTargetAttachments uses the ResourcePolicy of the attached Secret."
+          },
+          "@aws-cdk/aws-redshift:columnId": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Whether to use an ID to track Redshift column changes"
+          },
+          "@aws-cdk/aws-stepfunctions-tasks:enableEmrServicePolicyV2": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enable AmazonEMRServicePolicy_v2 managed policies"
+          },
+          "@aws-cdk/aws-ec2:restrictDefaultSecurityGroup": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Restrict access to the VPC default security group"
+          },
+          "@aws-cdk/aws-apigateway:requestValidatorUniqueId": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Generate a unique id for each RequestValidator added to a method"
+          },
+          "@aws-cdk/aws-kms:aliasNameRef": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "KMS Alias name and keyArn will have implicit reference to KMS Key"
+          },
+          "@aws-cdk/aws-kms:applyImportedAliasPermissionsToPrincipal": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enable grant methods on Aliases imported by name to use kms:ResourceAliases condition"
+          },
+          "@aws-cdk/aws-autoscaling:generateLaunchTemplateInsteadOfLaunchConfig": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Generate a launch template when creating an AutoScalingGroup"
+          },
+          "@aws-cdk/core:includePrefixInUniqueNameGeneration": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Include the stack prefix in the stack name generation process"
+          },
+          "@aws-cdk/aws-efs:denyAnonymousAccess": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "EFS denies anonymous clients accesses"
+          },
+          "@aws-cdk/aws-opensearchservice:enableOpensearchMultiAzWithStandby": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enables support for Multi-AZ with Standby deployment for opensearch domains"
+          },
+          "@aws-cdk/aws-lambda-nodejs:useLatestRuntimeVersion": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enables aws-lambda-nodejs.Function to use the latest available NodeJs runtime as the default"
+          },
+          "@aws-cdk/aws-efs:mountTargetOrderInsensitiveLogicalId": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, mount targets will have a stable logicalId that is linked to the associated subnet."
+          },
+          "@aws-cdk/aws-rds:auroraClusterChangeScopeOfInstanceParameterGroupWithEachParameters": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, a scope of InstanceParameterGroup for AuroraClusterInstance with each parameters will change."
+          },
+          "@aws-cdk/aws-appsync:useArnForSourceApiAssociationIdentifier": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, will always use the arn for identifiers for CfnSourceApiAssociation in the GraphqlApi construct rather than id."
+          },
+          "@aws-cdk/aws-rds:preventRenderingDeprecatedCredentials": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, creating an RDS database cluster from a snapshot will only render credentials for snapshot credentials."
+          },
+          "@aws-cdk/aws-codepipeline-actions:useNewDefaultBranchForCodeCommitSource": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the CodeCommit source action is using the default branch name 'main'."
+          },
+          "@aws-cdk/aws-cloudwatch-actions:changeLambdaPermissionLogicalIdForLambdaAction": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the logical ID of a Lambda permission for a Lambda action includes an alarm ID."
+          },
+          "@aws-cdk/aws-codepipeline:crossAccountKeysDefaultValueToFalse": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enables Pipeline to set the default value for crossAccountKeys to false."
+          },
+          "@aws-cdk/aws-codepipeline:defaultPipelineTypeToV2": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Enables Pipeline to set the default pipeline type to V2."
+          },
+          "@aws-cdk/aws-kms:reduceCrossAccountRegionPolicyScope": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, IAM Policy created from KMS key grant will reduce the resource scope to this key only."
+          },
+          "@aws-cdk/pipelines:reduceAssetRoleTrustScope": {
+            "recommendedValue": true,
+            "explanation": "Remove the root account principal from PipelineAssetsFileRole trust policy",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-eks:nodegroupNameAttribute": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, nodegroupName attribute of the provisioned EKS NodeGroup will not have the cluster name prefix."
+          },
+          "@aws-cdk/aws-ec2:ebsDefaultGp3Volume": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the default volume type of the EBS volume will be GP3"
+          },
+          "@aws-cdk/aws-ecs:removeDefaultDeploymentAlarm": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, remove default deployment alarm settings"
+          },
+          "@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault": {
+            "userValue": false,
+            "recommendedValue": false,
+            "explanation": "When enabled, the custom resource used for `AwsCustomResource` will configure the `logApiResponseData` property as true by default"
+          },
+          "@aws-cdk/aws-s3:keepNotificationInImportedBucket": {
+            "userValue": false,
+            "recommendedValue": false,
+            "explanation": "When enabled, Adding notifications to a bucket in the current stack will not remove notification from imported stack."
+          },
+          "@aws-cdk/aws-stepfunctions-tasks:useNewS3UriParametersForBedrockInvokeModelTask": {
+            "recommendedValue": true,
+            "explanation": "When enabled, use new props for S3 URI field in task definition of state machine for bedrock invoke model.",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/core:explicitStackTags": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, stack tags need to be assigned explicitly on a Stack."
+          },
+          "@aws-cdk/aws-ecs:enableImdsBlockingDeprecatedFeature": {
+            "userValue": false,
+            "recommendedValue": false,
+            "explanation": "When set to true along with canContainersAccessInstanceRole=false in ECS cluster, new updated commands will be added to UserData to block container accessing IMDS. **Applicable to Linux only. IMPORTANT: See [details.](#aws-cdkaws-ecsenableImdsBlockingDeprecatedFeature)**"
+          },
+          "@aws-cdk/aws-ecs:disableEcsImdsBlocking": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When set to true, CDK synth will throw exception if canContainersAccessInstanceRole is false. **IMPORTANT: See [details.](#aws-cdkaws-ecsdisableEcsImdsBlocking)**"
+          },
+          "@aws-cdk/aws-ecs:reduceEc2FargateCloudWatchPermissions": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, we will only grant the necessary permissions when users specify cloudwatch log group through logConfiguration"
+          },
+          "@aws-cdk/aws-dynamodb:resourcePolicyPerReplica": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled will allow you to specify a resource policy per replica, and not copy the source table policy to all replicas"
+          },
+          "@aws-cdk/aws-ec2:ec2SumTImeoutEnabled": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, initOptions.timeout and resourceSignalTimeout values will be summed together."
+          },
+          "@aws-cdk/aws-appsync:appSyncGraphQLAPIScopeLambdaPermission": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, a Lambda authorizer Permission created when using GraphqlApi will be properly scoped with a SourceArn."
+          },
+          "@aws-cdk/aws-rds:setCorrectValueForDatabaseInstanceReadReplicaInstanceResourceId": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the value of property `instanceResourceId` in construct `DatabaseInstanceReadReplica` will be set to the correct value which is `DbiResourceId` instead of currently `DbInstanceArn`"
+          },
+          "@aws-cdk/core:cfnIncludeRejectComplexResourceUpdateCreatePolicyIntrinsics": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, CFN templates added with `cfn-include` will error if the template contains Resource Update or Create policies with CFN Intrinsics that include non-primitive values."
+          },
+          "@aws-cdk/aws-lambda-nodejs:sdkV3ExcludeSmithyPackages": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, both `@aws-sdk` and `@smithy` packages will be excluded from the Lambda Node.js 18.x runtime to prevent version mismatches in bundled applications."
+          },
+          "@aws-cdk/aws-stepfunctions-tasks:fixRunEcsTaskPolicy": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the resource of IAM Run Ecs policy generated by SFN EcsRunTask will reference the definition, instead of constructing ARN."
+          },
+          "@aws-cdk/aws-ec2:bastionHostUseAmazonLinux2023ByDefault": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the BastionHost construct will use the latest Amazon Linux 2023 AMI, instead of Amazon Linux 2."
+          },
+          "@aws-cdk/core:aspectStabilization": {
+            "recommendedValue": true,
+            "explanation": "When enabled, a stabilization loop will be run when invoking Aspects during synthesis.",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-route53-targets:userPoolDomainNameMethodWithoutCustomResource": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, use a new method for DNS Name of user pool domain target without creating a custom resource."
+          },
+          "@aws-cdk/aws-elasticloadbalancingV2:albDualstackWithoutPublicIpv4SecurityGroupRulesDefault": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the default security group ingress rules will allow IPv6 ingress from anywhere"
+          },
+          "@aws-cdk/aws-iam:oidcRejectUnauthorizedConnections": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the default behaviour of OIDC provider will reject unauthorized connections"
+          },
+          "@aws-cdk/core:enableAdditionalMetadataCollection": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, CDK will expand the scope of usage data collected to better inform CDK development and improve communication for security concerns and emerging issues."
+          },
+          "@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy": {
+            "userValue": false,
+            "recommendedValue": false,
+            "explanation": "[Deprecated] When enabled, Lambda will create new inline policies with AddToRolePolicy instead of adding to the Default Policy Statement"
+          },
+          "@aws-cdk/aws-s3:setUniqueReplicationRoleName": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, CDK will automatically generate a unique role name that is used for s3 object replication."
+          },
+          "@aws-cdk/pipelines:reduceStageRoleTrustScope": {
+            "recommendedValue": true,
+            "explanation": "Remove the root account principal from Stage addActions trust policy",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-events:requireEventBusPolicySid": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, grantPutEventsTo() will use resource policies with Statement IDs for service principals."
+          },
+          "@aws-cdk/core:aspectPrioritiesMutating": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When set to true, Aspects added by the construct library on your behalf will be given a priority of MUTATING."
+          },
+          "@aws-cdk/aws-dynamodb:retainTableReplica": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, table replica will be default to the removal policy of source table unless specified otherwise."
+          },
+          "@aws-cdk/cognito:logUserPoolClientSecretValue": {
+            "recommendedValue": false,
+            "explanation": "When disabled, the value of the user pool client secret will not be logged in the custom resource lambda function logs.",
+            "unconfiguredBehavesLike": {
+              "v2": false
+            }
+          },
+          "@aws-cdk/pipelines:reduceCrossAccountActionRoleTrustScope": {
+            "recommendedValue": true,
+            "explanation": "When enabled, scopes down the trust policy for the cross-account action role",
+            "unconfiguredBehavesLike": {
+              "v2": true
+            }
+          },
+          "@aws-cdk/aws-stepfunctions:useDistributedMapResultWriterV2": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the resultWriterV2 property of DistributedMap will be used insted of resultWriter"
+          },
+          "@aws-cdk/s3-notifications:addS3TrustKeyPolicyForSnsSubscriptions": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "Add an S3 trust policy to a KMS key resource policy for SNS subscriptions."
+          },
+          "@aws-cdk/aws-ec2:requirePrivateSubnetsForEgressOnlyInternetGateway": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, the EgressOnlyGateway resource is only created if private subnets are defined in the dual-stack VPC."
+          },
+          "@aws-cdk/aws-ec2-alpha:useResourceIdForVpcV2Migration": {
+            "recommendedValue": false,
+            "explanation": "When enabled, use resource IDs for VPC V2 migration",
+            "unconfiguredBehavesLike": {
+              "v2": false
+            }
+          },
+          "@aws-cdk/aws-s3:publicAccessBlockedByDefault": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, setting any combination of options for BlockPublicAccess will automatically set true for any options not defined."
+          },
+          "@aws-cdk/aws-lambda:useCdkManagedLogGroup": {
+            "userValue": true,
+            "recommendedValue": true,
+            "explanation": "When enabled, CDK creates and manages loggroup for the lambda function",
+            "unconfiguredBehavesLike": {
+              "v2": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "minimumCliVersion": "2.1033.0"
+}

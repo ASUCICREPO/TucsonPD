@@ -18,3 +18,14 @@
 # CDK asset staging directory
 /.cdk.staging
 /backend/cdk.out
+
+
+# Ignore the tucson-pd-backend files
+/tucson-pd-backend/.venv
+
+# Ignore the tucson-pd-frontend files
+/tucson-pd-frontend/.venv
+/tucson-pd-frontend/build.zip
+/tucson-pd-frontend/frontend/node_modules
+/tucson-pd-frontend/frontend/dist
+

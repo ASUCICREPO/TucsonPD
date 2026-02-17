@@ -1,0 +1,4056 @@
+{
+ "Resources": {
+  "CasesTableABF7127D": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "case_id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "officer_id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "created_at",
+      "AttributeType": "N"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "officer-index",
+      "KeySchema": [
+       {
+        "AttributeName": "officer_id",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "created_at",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "status-index",
+      "KeySchema": [
+       {
+        "AttributeName": "status",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "created_at",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "case_id",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": false
+    },
+    "TableName": "TucsonPD-RedactionCases"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/CasesTable/Resource"
+   }
+  },
+  "GuidelinesTable52F2F85C": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "guideline_id",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "KeySchema": [
+     {
+      "AttributeName": "guideline_id",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": false
+    },
+    "TableName": "TucsonPD-Guidelines"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/GuidelinesTable/Resource"
+   }
+  },
+  "RedactionBucket98A3E28A": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "CorsConfiguration": {
+     "CorsRules": [
+      {
+       "AllowedHeaders": [
+        "*"
+       ],
+       "AllowedMethods": [
+        "GET",
+        "PUT",
+        "POST"
+       ],
+       "AllowedOrigins": [
+        "*"
+       ],
+       "ExposedHeaders": [
+        "ETag"
+       ],
+       "MaxAge": 3000
+      }
+     ]
+    },
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "Tags": [
+     {
+      "Key": "aws-cdk:auto-delete-objects",
+      "Value": "true"
+     }
+    ],
+    "VersioningConfiguration": {
+     "Status": "Enabled"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionBucket/Resource"
+   }
+  },
+  "RedactionBucketPolicy3A5443FD": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "RedactionBucket98A3E28A"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:PutBucketPolicy"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::GetAtt": [
+          "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+          "Arn"
+         ]
+        }
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "RedactionBucket98A3E28A",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "RedactionBucket98A3E28A",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionBucket/Policy/Resource"
+   }
+  },
+  "RedactionBucketAutoDeleteObjectsCustomResource3CB9D125": {
+   "Type": "Custom::S3AutoDeleteObjects",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+      "Arn"
+     ]
+    },
+    "BucketName": {
+     "Ref": "RedactionBucket98A3E28A"
+    }
+   },
+   "DependsOn": [
+    "RedactionBucketPolicy3A5443FD"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionBucket/AutoDeleteObjectsCustomResource/Default"
+   }
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/Custom::S3AutoDeleteObjectsCustomResourceProvider/Role"
+   }
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Lambda function for auto-deleting objects in ",
+       {
+        "Ref": "RedactionBucket98A3E28A"
+       },
+       " S3 bucket."
+      ]
+     ]
+    }
+   },
+   "DependsOn": [
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler",
+    "aws:asset:path": "asset.faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6",
+    "aws:asset:property": "Code"
+   }
+  },
+  "PdfProcessingLayer736F2CE6": {
+   "Type": "AWS::Lambda::LayerVersion",
+   "Properties": {
+    "CompatibleRuntimes": [
+     "python3.12"
+    ],
+    "Content": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "2b6c5a83d1d8063563a967d5c7f39c5c118d1f9db98cebbaec5a990397095ba3.zip"
+    },
+    "Description": "PDF processing libraries: pdfplumber and pymupdf"
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/PdfProcessingLayer/Resource",
+    "aws:asset:path": "asset.2b6c5a83d1d8063563a967d5c7f39c5c118d1f9db98cebbaec5a990397095ba3.zip",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Content"
+   }
+  },
+  "BedrockLambdaServiceRoleE2062991": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/BedrockLambda/ServiceRole/Resource"
+   }
+  },
+  "BedrockLambdaServiceRoleDefaultPolicyD8608AE4": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "CasesTableABF7127D",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "GuidelinesTable52F2F85C",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "CasesTableABF7127D",
+             "Arn"
+            ]
+           },
+           "/index/*"
+          ]
+         ]
+        },
+        {
+         "Ref": "AWS::NoValue"
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "RedactionBucket98A3E28A",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "RedactionBucket98A3E28A",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "bedrock:*",
+        "textract:DetectDocumentText",
+        "textract:GetDocumentTextDetection",
+        "textract:StartDocumentTextDetection"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "BedrockLambdaServiceRoleDefaultPolicyD8608AE4",
+    "Roles": [
+     {
+      "Ref": "BedrockLambdaServiceRoleE2062991"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/BedrockLambda/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "BedrockLambdaC6729693": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "dad393fafffb57b2ef347e6976ee268ab99aed491e7c0327829da3bb83cf1692.zip"
+    },
+    "Description": "Bedrock Lambda for PDF redaction processing",
+    "Environment": {
+     "Variables": {
+      "S3_BUCKET_NAME": {
+       "Ref": "RedactionBucket98A3E28A"
+      },
+      "DYNAMODB_TABLE_NAME": {
+       "Ref": "CasesTableABF7127D"
+      },
+      "DYNAMODB_GUIDELINES_TABLE_NAME": {
+       "Ref": "GuidelinesTable52F2F85C"
+      },
+      "BEDROCK_MODEL_ID": "us.meta.llama3-3-70b-instruct-v1:0"
+     }
+    },
+    "Handler": "lambda_function.lambda_handler",
+    "Layers": [
+     {
+      "Ref": "PdfProcessingLayer736F2CE6"
+     }
+    ],
+    "MemorySize": 1024,
+    "Role": {
+     "Fn::GetAtt": [
+      "BedrockLambdaServiceRoleE2062991",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 360
+   },
+   "DependsOn": [
+    "BedrockLambdaServiceRoleDefaultPolicyD8608AE4",
+    "BedrockLambdaServiceRoleE2062991"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/BedrockLambda/Resource",
+    "aws:asset:path": "asset.dad393fafffb57b2ef347e6976ee268ab99aed491e7c0327829da3bb83cf1692",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "BedrockLambdaLogGroup92CF80B9": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "BedrockLambdaC6729693"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/BedrockLambda/LogGroup/Resource"
+   }
+  },
+  "DatabaseLambdaServiceRoleA0D9D48F": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/DatabaseLambda/ServiceRole/Resource"
+   }
+  },
+  "DatabaseLambdaServiceRoleDefaultPolicyAC2D5EF4": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "CasesTableABF7127D",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "GuidelinesTable52F2F85C",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "CasesTableABF7127D",
+             "Arn"
+            ]
+           },
+           "/index/*"
+          ]
+         ]
+        },
+        {
+         "Ref": "AWS::NoValue"
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "RedactionBucket98A3E28A",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "RedactionBucket98A3E28A",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "BedrockLambdaC6729693",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "BedrockLambdaC6729693",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "DatabaseLambdaServiceRoleDefaultPolicyAC2D5EF4",
+    "Roles": [
+     {
+      "Ref": "DatabaseLambdaServiceRoleA0D9D48F"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/DatabaseLambda/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "DatabaseLambda78D2905C": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "69a1cafb1df2e760c0cae1afdfbc3c362f91998aa65bdd362578b55171c0e3c0.zip"
+    },
+    "Description": "Database management Lambda for API operations",
+    "Environment": {
+     "Variables": {
+      "S3_BUCKET_NAME": {
+       "Ref": "RedactionBucket98A3E28A"
+      },
+      "DYNAMODB_TABLE_NAME": {
+       "Ref": "CasesTableABF7127D"
+      },
+      "DYNAMODB_GUIDELINES_TABLE_NAME": {
+       "Ref": "GuidelinesTable52F2F85C"
+      },
+      "BEDROCK_LAMBDA_NAME": {
+       "Ref": "BedrockLambdaC6729693"
+      }
+     }
+    },
+    "Handler": "lambda_function.lambda_handler",
+    "MemorySize": 512,
+    "Role": {
+     "Fn::GetAtt": [
+      "DatabaseLambdaServiceRoleA0D9D48F",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "DatabaseLambdaServiceRoleDefaultPolicyAC2D5EF4",
+    "DatabaseLambdaServiceRoleA0D9D48F"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/DatabaseLambda/Resource",
+    "aws:asset:path": "asset.69a1cafb1df2e760c0cae1afdfbc3c362f91998aa65bdd362578b55171c0e3c0",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "DatabaseLambdaLogGroup9D056996": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "DatabaseLambda78D2905C"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/DatabaseLambda/LogGroup/Resource"
+   }
+  },
+  "RedactionApi07E20785": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Description": "API for TucsonPD Redaction System",
+    "Name": "TucsonPD-RedactionAPI"
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Resource"
+   }
+  },
+  "RedactionApiDeployment2949237D4594e3ad201ba26f3255b0ec2c33ccea": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "API for TucsonPD Redaction System",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "DependsOn": [
+    "RedactionApicasescaseidDELETEF29E1281",
+    "RedactionApicasescaseidGETCD3019D9",
+    "RedactionApicasescaseidOPTIONS2D71B856",
+    "RedactionApicasescaseid6018DA2F",
+    "RedactionApicasescaseids3pathOPTIONS6585B891",
+    "RedactionApicasescaseids3pathPUT0308355D",
+    "RedactionApicasescaseids3path6BA50E2E",
+    "RedactionApicasescaseidstatusOPTIONSC27A6C92",
+    "RedactionApicasescaseidstatusPUT0688373D",
+    "RedactionApicasescaseidstatus1E86EFE5",
+    "RedactionApicasesGETC57B8DFF",
+    "RedactionApicasesOPTIONS30B33CCC",
+    "RedactionApicasesPOST923C110B",
+    "RedactionApicases36722D28",
+    "RedactionApiguidelinesguidelineidactivateOPTIONSBC39A93A",
+    "RedactionApiguidelinesguidelineidactivatePUT9BEE1FF8",
+    "RedactionApiguidelinesguidelineidactivate2CF4FAD1",
+    "RedactionApiguidelinesguidelineidDELETE3A639DDD",
+    "RedactionApiguidelinesguidelineidOPTIONS97269DB0",
+    "RedactionApiguidelinesguidelineidprocessOPTIONSC2771BE9",
+    "RedactionApiguidelinesguidelineidprocessPOST65A713A0",
+    "RedactionApiguidelinesguidelineidprocess91D19E95",
+    "RedactionApiguidelinesguidelineidPUT862A923D",
+    "RedactionApiguidelinesguidelineid459A3E95",
+    "RedactionApiguidelinesactiveGETDBBDC7D2",
+    "RedactionApiguidelinesactiveOPTIONS1FDDC08E",
+    "RedactionApiguidelinesactiveB723A5BF",
+    "RedactionApiguidelinesallGETBC287C8A",
+    "RedactionApiguidelinesallOPTIONSF9961F83",
+    "RedactionApiguidelinesallED91F518",
+    "RedactionApiguidelinesOPTIONS88217042",
+    "RedactionApiguidelines42CF6076",
+    "RedactionApiguidelinesuploadOPTIONS34EB648F",
+    "RedactionApiguidelinesuploadPOST6A131FF1",
+    "RedactionApiguidelinesuploadC999045D",
+    "RedactionApiOPTIONSB7E2DFA0",
+    "RedactionApipresignedurldownloadOPTIONS85DCB48A",
+    "RedactionApipresignedurldownloadPOST006A6308",
+    "RedactionApipresignedurldownload1F709854",
+    "RedactionApipresignedurlOPTIONS089404FB",
+    "RedactionApipresignedurl591F293C",
+    "RedactionApipresignedurluploadOPTIONS742DFADC",
+    "RedactionApipresignedurluploadPOST587C4EE0",
+    "RedactionApipresignedurlupload7F3FE4D5"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "RedactionApiDeploymentStageprodE98E85D4": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "RedactionApiDeployment2949237D4594e3ad201ba26f3255b0ec2c33ccea"
+    },
+    "MethodSettings": [
+     {
+      "DataTraceEnabled": false,
+      "HttpMethod": "*",
+      "ResourcePath": "/*",
+      "ThrottlingBurstLimit": 2000,
+      "ThrottlingRateLimit": 1000
+     }
+    ],
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    },
+    "StageName": "prod"
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/DeploymentStage.prod/Resource"
+   }
+  },
+  "RedactionApiOPTIONSB7E2DFA0": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "RedactionApi07E20785",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/OPTIONS/Resource"
+   }
+  },
+  "RedactionApicases36722D28": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "RedactionApi07E20785",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "cases",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/Resource"
+   }
+  },
+  "RedactionApicasesOPTIONS30B33CCC": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApicases36722D28"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/OPTIONS/Resource"
+   }
+  },
+  "RedactionApicasesPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTcases512B4CD1": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/POST/cases"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..cases"
+   }
+  },
+  "RedactionApicasesPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTcases7FB95C2C": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/POST/cases"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..cases"
+   }
+  },
+  "RedactionApicasesPOST923C110B": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApicases36722D28"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/POST/Resource"
+   }
+  },
+  "RedactionApicasesGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETcases0A6BCE61": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/GET/cases"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..cases"
+   }
+  },
+  "RedactionApicasesGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETcases177FA6C5": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/GET/cases"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..cases"
+   }
+  },
+  "RedactionApicasesGETC57B8DFF": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApicases36722D28"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/GET/Resource"
+   }
+  },
+  "RedactionApicasescaseid6018DA2F": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApicases36722D28"
+    },
+    "PathPart": "{case_id}",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/Resource"
+   }
+  },
+  "RedactionApicasescaseidOPTIONS2D71B856": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApicasescaseid6018DA2F"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/OPTIONS/Resource"
+   }
+  },
+  "RedactionApicasescaseidGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETcasescaseid35FE9BB0": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/GET/cases/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..cases.{case_id}"
+   }
+  },
+  "RedactionApicasescaseidGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETcasescaseid1883AD56": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/GET/cases/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..cases.{case_id}"
+   }
+  },
+  "RedactionApicasescaseidGETCD3019D9": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApicasescaseid6018DA2F"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/GET/Resource"
+   }
+  },
+  "RedactionApicasescaseidDELETEApiPermissionTucsonPdBackendStackRedactionApiF105C143DELETEcasescaseid4D561129": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/DELETE/cases/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/DELETE/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.DELETE..cases.{case_id}"
+   }
+  },
+  "RedactionApicasescaseidDELETEApiPermissionTestTucsonPdBackendStackRedactionApiF105C143DELETEcasescaseid7157979A": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/DELETE/cases/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/DELETE/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.DELETE..cases.{case_id}"
+   }
+  },
+  "RedactionApicasescaseidDELETEF29E1281": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "DELETE",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApicasescaseid6018DA2F"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/DELETE/Resource"
+   }
+  },
+  "RedactionApicasescaseidstatus1E86EFE5": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApicasescaseid6018DA2F"
+    },
+    "PathPart": "status",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/Resource"
+   }
+  },
+  "RedactionApicasescaseidstatusOPTIONSC27A6C92": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApicasescaseidstatus1E86EFE5"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/OPTIONS/Resource"
+   }
+  },
+  "RedactionApicasescaseidstatusPUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTcasescaseidstatus1CD11738": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/PUT/cases/*/status"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.status"
+   }
+  },
+  "RedactionApicasescaseidstatusPUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTcasescaseidstatus496B11CD": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/PUT/cases/*/status"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.status"
+   }
+  },
+  "RedactionApicasescaseidstatusPUT0688373D": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "PUT",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApicasescaseidstatus1E86EFE5"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/status/PUT/Resource"
+   }
+  },
+  "RedactionApicasescaseids3path6BA50E2E": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApicasescaseid6018DA2F"
+    },
+    "PathPart": "s3-path",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/Resource"
+   }
+  },
+  "RedactionApicasescaseids3pathOPTIONS6585B891": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApicasescaseids3path6BA50E2E"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/OPTIONS/Resource"
+   }
+  },
+  "RedactionApicasescaseids3pathPUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTcasescaseids3path322B20CD": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/PUT/cases/*/s3-path"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.s3-path"
+   }
+  },
+  "RedactionApicasescaseids3pathPUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTcasescaseids3path9B7685A9": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/PUT/cases/*/s3-path"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..cases.{case_id}.s3-path"
+   }
+  },
+  "RedactionApicasescaseids3pathPUT0308355D": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "PUT",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApicasescaseids3path6BA50E2E"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/cases/{case_id}/s3-path/PUT/Resource"
+   }
+  },
+  "RedactionApipresignedurl591F293C": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "RedactionApi07E20785",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "presigned-url",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/Resource"
+   }
+  },
+  "RedactionApipresignedurlOPTIONS089404FB": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApipresignedurl591F293C"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/OPTIONS/Resource"
+   }
+  },
+  "RedactionApipresignedurlupload7F3FE4D5": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApipresignedurl591F293C"
+    },
+    "PathPart": "upload",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/Resource"
+   }
+  },
+  "RedactionApipresignedurluploadOPTIONS742DFADC": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApipresignedurlupload7F3FE4D5"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/OPTIONS/Resource"
+   }
+  },
+  "RedactionApipresignedurluploadPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTpresignedurluploadC46F9E5D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/POST/presigned-url/upload"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.upload"
+   }
+  },
+  "RedactionApipresignedurluploadPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTpresignedurluploadAC3C0C2D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/POST/presigned-url/upload"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.upload"
+   }
+  },
+  "RedactionApipresignedurluploadPOST587C4EE0": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApipresignedurlupload7F3FE4D5"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/upload/POST/Resource"
+   }
+  },
+  "RedactionApipresignedurldownload1F709854": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApipresignedurl591F293C"
+    },
+    "PathPart": "download",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/Resource"
+   }
+  },
+  "RedactionApipresignedurldownloadOPTIONS85DCB48A": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApipresignedurldownload1F709854"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/OPTIONS/Resource"
+   }
+  },
+  "RedactionApipresignedurldownloadPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTpresignedurldownload67946D0D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/POST/presigned-url/download"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.download"
+   }
+  },
+  "RedactionApipresignedurldownloadPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTpresignedurldownload9E85B5BA": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/POST/presigned-url/download"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..presigned-url.download"
+   }
+  },
+  "RedactionApipresignedurldownloadPOST006A6308": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApipresignedurldownload1F709854"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/presigned-url/download/POST/Resource"
+   }
+  },
+  "RedactionApiguidelines42CF6076": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "RedactionApi07E20785",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "guidelines",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/Resource"
+   }
+  },
+  "RedactionApiguidelinesOPTIONS88217042": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApiguidelines42CF6076"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/OPTIONS/Resource"
+   }
+  },
+  "RedactionApiguidelinesuploadC999045D": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApiguidelines42CF6076"
+    },
+    "PathPart": "upload",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/Resource"
+   }
+  },
+  "RedactionApiguidelinesuploadOPTIONS34EB648F": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesuploadC999045D"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/OPTIONS/Resource"
+   }
+  },
+  "RedactionApiguidelinesuploadPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTguidelinesuploadC345E081": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/POST/guidelines/upload"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.upload"
+   }
+  },
+  "RedactionApiguidelinesuploadPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTguidelinesupload38AAADEB": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/POST/guidelines/upload"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.upload"
+   }
+  },
+  "RedactionApiguidelinesuploadPOST6A131FF1": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesuploadC999045D"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/upload/POST/Resource"
+   }
+  },
+  "RedactionApiguidelinesallED91F518": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApiguidelines42CF6076"
+    },
+    "PathPart": "all",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/all/Resource"
+   }
+  },
+  "RedactionApiguidelinesallOPTIONSF9961F83": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesallED91F518"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/all/OPTIONS/Resource"
+   }
+  },
+  "RedactionApiguidelinesallGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETguidelinesall5018BB80": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/GET/guidelines/all"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/all/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.all"
+   }
+  },
+  "RedactionApiguidelinesallGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETguidelinesall11B162E6": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/GET/guidelines/all"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/all/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.all"
+   }
+  },
+  "RedactionApiguidelinesallGETBC287C8A": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesallED91F518"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/all/GET/Resource"
+   }
+  },
+  "RedactionApiguidelinesactiveB723A5BF": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApiguidelines42CF6076"
+    },
+    "PathPart": "active",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/active/Resource"
+   }
+  },
+  "RedactionApiguidelinesactiveOPTIONS1FDDC08E": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesactiveB723A5BF"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/active/OPTIONS/Resource"
+   }
+  },
+  "RedactionApiguidelinesactiveGETApiPermissionTucsonPdBackendStackRedactionApiF105C143GETguidelinesactive1BC04FE6": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/GET/guidelines/active"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/active/GET/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.active"
+   }
+  },
+  "RedactionApiguidelinesactiveGETApiPermissionTestTucsonPdBackendStackRedactionApiF105C143GETguidelinesactive8314B804": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/GET/guidelines/active"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/active/GET/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.GET..guidelines.active"
+   }
+  },
+  "RedactionApiguidelinesactiveGETDBBDC7D2": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesactiveB723A5BF"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/active/GET/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineid459A3E95": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApiguidelines42CF6076"
+    },
+    "PathPart": "{guideline_id}",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidOPTIONS97269DB0": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesguidelineid459A3E95"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/OPTIONS/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidPUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineid1CC44872": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/PUT/guidelines/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}"
+   }
+  },
+  "RedactionApiguidelinesguidelineidPUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineid3500638A": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/PUT/guidelines/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}"
+   }
+  },
+  "RedactionApiguidelinesguidelineidPUT862A923D": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "PUT",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesguidelineid459A3E95"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/PUT/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidDELETEApiPermissionTucsonPdBackendStackRedactionApiF105C143DELETEguidelinesguidelineid7ADA85D2": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/DELETE/guidelines/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/DELETE/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.DELETE..guidelines.{guideline_id}"
+   }
+  },
+  "RedactionApiguidelinesguidelineidDELETEApiPermissionTestTucsonPdBackendStackRedactionApiF105C143DELETEguidelinesguidelineid0BE7A208": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/DELETE/guidelines/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/DELETE/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.DELETE..guidelines.{guideline_id}"
+   }
+  },
+  "RedactionApiguidelinesguidelineidDELETE3A639DDD": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "DELETE",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesguidelineid459A3E95"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/DELETE/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidprocess91D19E95": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApiguidelinesguidelineid459A3E95"
+    },
+    "PathPart": "process",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidprocessOPTIONSC2771BE9": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesguidelineidprocess91D19E95"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/OPTIONS/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidprocessPOSTApiPermissionTucsonPdBackendStackRedactionApiF105C143POSTguidelinesguidelineidprocessF2931CDC": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/POST/guidelines/*/process"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/POST/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.{guideline_id}.process"
+   }
+  },
+  "RedactionApiguidelinesguidelineidprocessPOSTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143POSTguidelinesguidelineidprocessE080FF47": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/POST/guidelines/*/process"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/POST/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.POST..guidelines.{guideline_id}.process"
+   }
+  },
+  "RedactionApiguidelinesguidelineidprocessPOST65A713A0": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesguidelineidprocess91D19E95"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/process/POST/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidactivate2CF4FAD1": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RedactionApiguidelinesguidelineid459A3E95"
+    },
+    "PathPart": "activate",
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidactivateOPTIONSBC39A93A": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesguidelineidactivate2CF4FAD1"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/OPTIONS/Resource"
+   }
+  },
+  "RedactionApiguidelinesguidelineidactivatePUTApiPermissionTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineidactivateE3191EA0": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/",
+       {
+        "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+       },
+       "/PUT/guidelines/*/activate"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/PUT/ApiPermission.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}.activate"
+   }
+  },
+  "RedactionApiguidelinesguidelineidactivatePUTApiPermissionTestTucsonPdBackendStackRedactionApiF105C143PUTguidelinesguidelineidactivateB223999D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DatabaseLambda78D2905C",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "RedactionApi07E20785"
+       },
+       "/test-invoke-stage/PUT/guidelines/*/activate"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/PUT/ApiPermission.Test.TucsonPdBackendStackRedactionApiF105C143.PUT..guidelines.{guideline_id}.activate"
+   }
+  },
+  "RedactionApiguidelinesguidelineidactivatePUT9BEE1FF8": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "PUT",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "DatabaseLambda78D2905C",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RedactionApiguidelinesguidelineidactivate2CF4FAD1"
+    },
+    "RestApiId": {
+     "Ref": "RedactionApi07E20785"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/RedactionApi/Default/guidelines/{guideline_id}/activate/PUT/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/+1a227jNhD9luVjwKhN8uY3JXHTYJ1Elb0FCsMIRuJE5oYiVZJKVivo3wtSFyuXBrsFstmgerBNneFl5sxwhpJ1GBweHAS/foB7s5+y233Bk6BeWkhvKdyb65pVEnLFkqBeQSJwXZMCtOWWK/kRKzKriYQcyYzsEUpsVbjmkjSUJFwILrMLxRwUhX9dR/P4Op7/8Wm+XBFKCsWlPZcrnmOMqbpDXZHZDQiDlGjM1R2ISAmeVmRGGBqrVeVWcEpc9is2tCbA2JlQCYglpkoy0NW5ZPiFzNY14a51udOv0Oozpk73VatpuFg4+FssajY/frWfieoNPbmRPgYaao6C+rhMb9GuawKlVaco0OJV4uw1ZGZ1iZQkQqW3UZkInoZpisZ0qqdKG08YCKHukV2g3SrmIHI2d/pGn/z31XJFNrTvdaV5xmU/Rwf+jsBQ9yB+KZR5DObwJcwGGwjKVFeF49Sxd3R9EV6GZ/NT8hITd6gNVxJZa1kXBydKm7gU+DamUI/skU3rmNYbtP1pTVjXJPGXI/+N5V3nYzC43jRUQJ4wCOoFVKj/bC1e146FVPOesNZ9DIdmXoDlicC4lJbnaEZrjSeiv5XS74RnZ0R5x7WSOUrbIcKN9TTuOd5yzJWulvzrEP08R1XapxptQTKBurvSrVbjXDEfr7UeSHxV4WJsjcO+hYJ3a7N3fu9v145Q59y4MHCZ4xqMQWuC0P1QDnlQx8oXFjCmzJEd+1RXaC5TXoAI01SVAyttHzcgTAf6Grc1JGTIfGRzbNPLGKtC3fXttV+pqF+i3/LrupNaC+n2XAoucZANhr8ofHne15NO1P2L1EejM5p2WdFx0auyUk7yRMOnMGNLCxZdqJsHy74S/FMp6Sls2WuoUJkJ6oXKzrQqi3VNRNd8cCh7CrYloYMbCgXPwOI9VEEdo7FhwX1puIFSWFdZI403gmdbe+XTpHGB7SvlM8XzYZX00FCI2xhnWAhVjaayW62sdaem41Ibu+A57/fJThSDxbHEWMjGh89n8rhubXlkd2chPfVqOG6frYNQ8GEaC1zuuptxOl+phcp4CuKcPdoCEz7hE/7/xX2y2WUNunQJy6eaHnqS4/57+vOL+RVojEaVOkV/L+GP7G3+XdcuIXpRf1a1tmhlHcClxUzDKAuqUcIv7VZp/tUdbsdX5/3oHoLRXbbPzFDwj1jF+HfJtbtv6+52n+/vDttOpRhNoaTpzkDGgi3Nye6crTtxBBpytH3FaTZN55CLB7N87yR0IutHkdXV0jedYXLY5LDJYRPdE93vj+6JrCk2J7onuieyptic6J7onuh+l3RPDntnDpvo/k66/TPadsDwkLZ9hWv3LLgAu41A28FBk/TNpf2/ht5hTbPzne+7+2zoSWmsysfyB2MfySOt7jhD7R7UU/8GhnuAz2XmxlyVtihtQ6PKbpX85Sg4OAyOPnw2nO93L5UE3Ws+/wBDWaF0NSgAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "TucsonPdBackendStack/CDKMetadata/Default"
+   },
+   "Condition": "CDKMetadataAvailable"
+  }
+ },
+ "Outputs": {
+  "RedactionApiEndpointE64F25AA": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "RedactionApi07E20785"
+      },
+      ".execute-api.",
+      {
+       "Ref": "AWS::Region"
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "s3bucketname": {
+   "Description": "S3 bucket for storing redaction files",
+   "Value": {
+    "Ref": "RedactionBucket98A3E28A"
+   },
+   "Export": {
+    "Name": "RedactionBucketName"
+   }
+  },
+  "casestablename": {
+   "Description": "DynamoDB table for case metadata",
+   "Value": {
+    "Ref": "CasesTableABF7127D"
+   },
+   "Export": {
+    "Name": "CasesTableName"
+   }
+  },
+  "guidelinestablename": {
+   "Description": "DynamoDB table for guidelines metadata",
+   "Value": {
+    "Ref": "GuidelinesTable52F2F85C"
+   },
+   "Export": {
+    "Name": "GuidelinesTableName"
+   }
+  },
+  "databaselambdaname": {
+   "Description": "Database management Lambda function",
+   "Value": {
+    "Ref": "DatabaseLambda78D2905C"
+   },
+   "Export": {
+    "Name": "DatabaseLambdaName"
+   }
+  },
+  "bedrocklambdaname": {
+   "Description": "Bedrock processing Lambda function",
+   "Value": {
+    "Ref": "BedrockLambdaC6729693"
+   },
+   "Export": {
+    "Name": "BedrockLambdaName"
+   }
+  },
+  "apigatewayurl": {
+   "Description": "API Gateway endpoint URL",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "RedactionApi07E20785"
+      },
+      ".execute-api.",
+      {
+       "Ref": "AWS::Region"
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "RedactionApiDeploymentStageprodE98E85D4"
+      },
+      "/"
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "ApiGatewayUrl"
+   }
+  }
+ },
+ "Conditions": {
+  "CDKMetadataAvailable": {
+   "Fn::Or": [
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "af-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-3"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-south-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-3"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-4"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ca-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ca-west-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "cn-north-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "cn-northwest-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-central-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-north-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-south-2"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-3"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "il-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "me-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "me-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "sa-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-east-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-west-1"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "AWS::Region"
+      },
+      "us-west-2"
+     ]
+    }
+   ]
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
