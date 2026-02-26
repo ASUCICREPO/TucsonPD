@@ -313,6 +313,7 @@ class TucsonPdFrontendStack(Stack):
                     cognito.OAuthScope.OPENID,
                     cognito.OAuthScope.EMAIL,
                     cognito.OAuthScope.PROFILE,
+                    cognito.OAuthScope.COGNITO_ADMIN,  # Required by Amplify v6 for fetchUserAttributes()
                 ],
                 # Placeholder callback URLs - will be updated by Lambda after Amplify app is created
                 callback_urls=[

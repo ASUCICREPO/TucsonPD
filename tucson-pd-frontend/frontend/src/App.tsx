@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SignInScreen } from './components/sign-in-screen';
-import { SignUpScreen } from './components/sign-up-screen';
 import { DashboardScreen } from './components/dashboard-screen';
 import { CaseDetailScreen } from './components/case-detail-screen';
 import { IntakeFormScreen, IntakeFormData } from './components/intake-form-screen';
@@ -9,17 +9,18 @@ import { UploadGuidelineScreen } from './components/upload-guideline-screen';
 import { ReviewExtractedRules } from './components/review-extracted-rules';
 import { GuidelineSavedConfirmation } from './components/guideline-saved-confirmation';
 import { User, LogOut, ChevronDown } from 'lucide-react';
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 
-type FlowStep = 'sign-in' | 'sign-up' | 'dashboard' | 'intake-form' | 'case-detail' | 'admin-dashboard' | 'upload-guideline' | 'review-rules' | 'guideline-saved';
+type FlowStep = 'sign-in' | 'dashboard' | 'intake-form' | 'case-detail' | 'admin-dashboard' | 'upload-guideline' | 'review-rules' | 'guideline-saved';
 
 type RedactionStage = 'upload' | 'analyzing' | 'rules-review' | 'processing' | 'complete';
 
-export default function App() {
+// ─── Inner app — has access to AuthContext ─────────────────────────────────────
+
+function AppInner() {
+  const { isLoading, isAuthenticated, userRole, currentUser, logout } = useAuth();
+
   const [currentStep, setCurrentStep] = useState<FlowStep>('sign-in');
-  const [userRole, setUserRole] = useState<'admin' | 'officer' | null>(null);
-  const [currentUser, setCurrentUser] = useState({ name: '', badgeId: '', email: '' });
-  const [registeredUsers, setRegisteredUsers] = useState<Array<{ name: string; badgeId: string; email: string; password: string }>>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [isNewCase, setIsNewCase] = useState(false);
   const [intakeFormData, setIntakeFormData] = useState<IntakeFormData | null>(null);
@@ -32,11 +33,31 @@ export default function App() {
   } | null>(null);
   const [shouldActivateGuideline, setShouldActivateGuideline] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  
+
   // Track active processing timers to avoid creating duplicate timers
   const activeTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   // Track which cases are currently processing to detect NEW processing cases
   const previousProcessingCasesRef = useRef<Set<string>>(new Set());
+
+  // ── Route to the correct screen once Cognito auth resolves ──────────────────
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (!isAuthenticated) {
+      setCurrentStep('sign-in');
+      return;
+    }
+
+    // Only redirect if we're currently on the sign-in screen, so we don't
+    // override any deeper navigation the user has already done.
+    if (currentStep === 'sign-in') {
+      if (userRole === 'admin') {
+        setCurrentStep('admin-dashboard');
+      } else {
+        setCurrentStep('dashboard');
+      }
+    }
+  }, [isLoading, isAuthenticated, userRole]);
 
   // Start with some default cases in the table
   const [cases, setCases] = useState<Array<{
@@ -232,22 +253,7 @@ export default function App() {
     }
   ]);
 
-  const handleSignIn = (role: 'admin' | 'officer', userData: { name: string; badgeId: string; email: string }) => {
-    setUserRole(role);
-    setCurrentUser(userData);
-    if (role === 'admin') {
-      setCurrentStep('admin-dashboard');
-    } else {
-      setCurrentStep('dashboard');
-    }
-  };
-
-  const handleSignUp = () => {
-    setCurrentStep('sign-up');
-  };
-
   const handleViewCase = (caseId: string) => {
-    // Find the case by caseId (not id)
     const caseToView = cases.find(c => c.caseId === caseId);
     if (caseToView) {
       setSelectedCaseId(caseToView.id);
@@ -258,18 +264,14 @@ export default function App() {
 
   const handleUpdateCase = (updatedCase: any) => {
     setCases(cases.map(c => c.id === updatedCase.id ? updatedCase : c));
-    // Update the selected case as well
     setSelectedCaseId(updatedCase.id);
   };
 
   const handleAddCase = (newCase: any) => {
     setCases(prevCases => [...prevCases, newCase]);
-    // Don't set isNewCase to false here - keep it true during the redaction workflow
-    // It will be set to false when user navigates back to dashboard
   };
 
   const handleStartNewCase = () => {
-    // Start with intake form for new cases
     setIsNewCase(true);
     setSelectedCaseId(null);
     setIntakeFormData(null);
@@ -277,15 +279,14 @@ export default function App() {
   };
 
   const handleIntakeFormSubmit = (formData: IntakeFormData) => {
-    // Save intake form data and proceed to document upload
     setIntakeFormData(formData);
     setCurrentStep('case-detail');
   };
 
-  const handleSignOut = () => {
-    setUserRole(null);
-    setCurrentStep('sign-in');
+  const handleSignOut = async () => {
     setShowProfileDropdown(false);
+    await logout();
+    setCurrentStep('sign-in');
   };
 
   // Background processing for cases that are processing
@@ -293,31 +294,25 @@ export default function App() {
     const currentProcessingCases = new Set(cases.filter(c => c.isProcessing === true).map(c => c.id));
     const previousProcessingCases = previousProcessingCasesRef.current;
     const activeTimers = activeTimersRef.current;
-    
-    // Find cases that JUST STARTED processing (not in previous set, but in current set)
-    const newlyProcessingCases = cases.filter(c => 
-      c.isProcessing && 
+
+    const newlyProcessingCases = cases.filter(c =>
+      c.isProcessing &&
       !previousProcessingCases.has(c.id)
     );
-    
-    // Create timers ONLY for newly processing cases
+
     newlyProcessingCases.forEach(caseData => {
       console.log(`Starting 30-second timer for case ${caseData.caseId}`);
       const timeout = setTimeout(() => {
         console.log(`Timer completed for case ${caseData.caseId}`);
-        // Update case to "Review Now" status after 30 seconds
-        setCases(prevCases => 
+        setCases(prevCases =>
           prevCases.map(c => {
             if (c.id === caseData.id && c.isProcessing) {
-              // Generate a simulated redacted document (same as unredacted for demo purposes)
-              const redactedFileData = c.fileData; // In real app, this would be the redacted version
-              
+              const redactedFileData = c.fileData;
               return {
                 ...c,
                 isProcessing: false,
                 redactionStatus: 'Review Now' as const,
                 redactionStage: 'rules-review' as const,
-                // Store redacted document data for later download
                 redactedFileData: redactedFileData,
                 redactedFileName: c.fileName ? c.fileName.replace('_Unredacted', '_Redacted') : 'redacted_document.pdf'
               };
@@ -325,47 +320,46 @@ export default function App() {
             return c;
           })
         );
-        
-        // Remove this timer from active timers
         activeTimers.delete(caseData.id);
-      }, 30000); // 30 seconds processing time
-      
-      // Store the timeout reference
+      }, 30000);
+
       activeTimers.set(caseData.id, timeout);
     });
-    
-    // Clear timers for cases that stopped processing
+
     previousProcessingCases.forEach(caseId => {
       if (!currentProcessingCases.has(caseId) && activeTimers.has(caseId)) {
         clearTimeout(activeTimers.get(caseId)!);
         activeTimers.delete(caseId);
       }
     });
-    
-    // Update the previous processing cases
+
     previousProcessingCasesRef.current = currentProcessingCases;
-    
-    // Only cleanup on unmount, not on every re-render
-  }, [cases]); // Run whenever cases array changes
+  }, [cases]);
+
+  // Show a blank screen while Cognito session check is in progress to
+  // avoid flashing the sign-in screen at already-authenticated users.
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const renderStep = () => {
     switch (currentStep) {
       case 'sign-in':
-        return <SignInScreen onSignIn={handleSignIn} onNavigateToSignUp={handleSignUp} />;
-      case 'sign-up':
+        return <SignInScreen />;
+      case 'dashboard':
         return (
-          <SignUpScreen
-            onSignUp={(userData) => {
-              // Show success toast
-              toast.success('Account created successfully! Please sign in.');
-              // Navigate back to sign in
-              setCurrentStep('sign-in');
-            }}
-            onBackToSignIn={() => setCurrentStep('sign-in')}
+          <DashboardScreen
+            onStartNewCase={handleStartNewCase}
+            onViewCase={handleViewCase}
+            cases={cases}
+            onUpdateCases={setCases}
+            currentUserEmail={currentUser?.email ?? ''}
           />
         );
-      case 'dashboard':
-        return <DashboardScreen onStartNewCase={handleStartNewCase} onViewCase={handleViewCase} cases={cases} onUpdateCases={setCases} currentUserEmail={currentUser.email} />;
       case 'intake-form':
         return (
           <IntakeFormScreen
@@ -377,7 +371,6 @@ export default function App() {
           />
         );
       case 'case-detail':
-        // For new case, create a temporary case object
         if (isNewCase) {
           const newCaseNumber = 45820 + cases.length + 1;
           const tempCase = {
@@ -386,7 +379,6 @@ export default function App() {
             requesterName: intakeFormData?.requesterName || 'New Requester',
             redactionStatus: 'Not Started' as const,
             dateCreated: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            // Pass intake form data to case detail
             intakeFormData: intakeFormData
           };
           return (
@@ -405,8 +397,7 @@ export default function App() {
             />
           );
         }
-        
-        // For existing case
+
         const selectedCase = cases.find(c => c.id === selectedCaseId);
         if (!selectedCase) {
           setCurrentStep('dashboard');
@@ -423,9 +414,9 @@ export default function App() {
         );
       case 'admin-dashboard':
         return (
-          <AdminDashboard 
-            cases={cases} 
-            onUpdateCases={setCases} 
+          <AdminDashboard
+            cases={cases}
+            onUpdateCases={setCases}
             onUploadGuideline={() => setCurrentStep('upload-guideline')}
             newGuideline={savedGuidelineData}
             shouldActivateNewGuideline={shouldActivateGuideline}
@@ -436,7 +427,6 @@ export default function App() {
           <UploadGuidelineScreen
             onBack={() => setCurrentStep('admin-dashboard')}
             onScanDocument={(file) => {
-              // Store the uploaded file and navigate to review rules
               setUploadedGuidelineFile(file);
               setUploadedGuidelineFileUrl(URL.createObjectURL(file));
               setCurrentStep('review-rules');
@@ -444,7 +434,6 @@ export default function App() {
           />
         );
       case 'review-rules':
-        // Mock extracted rules data
         const mockExtractedRules = [
           {
             id: '1',
@@ -501,8 +490,7 @@ export default function App() {
             fileName={uploadedGuidelineFile?.name || 'guideline-document.pdf'}
             extractedRules={mockExtractedRules}
             fileUrl={uploadedGuidelineFileUrl}
-            onSaveGuideline={(rules) => {
-              // Navigate directly to confirmation screen
+            onSaveGuideline={() => {
               setCurrentStep('guideline-saved');
               setUploadedGuidelineFile(null);
               setUploadedGuidelineFileUrl(null);
@@ -512,21 +500,17 @@ export default function App() {
                 uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
               });
             }}
-            onBackToUpload={() => {
-              setCurrentStep('upload-guideline');
-            }}
+            onBackToUpload={() => setCurrentStep('upload-guideline')}
           />
         );
       case 'guideline-saved':
         return (
           <GuidelineSavedConfirmation
             onSetAsActive={() => {
-              // Set flag to activate the new guideline
               setShouldActivateGuideline(true);
               setCurrentStep('admin-dashboard');
             }}
             onGoToDashboard={() => {
-              // Go to dashboard without activating
               setShouldActivateGuideline(false);
               setCurrentStep('admin-dashboard');
             }}
@@ -538,13 +522,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Toaster position="bottom-right" richColors />
-      {currentStep !== 'sign-in' && currentStep !== 'sign-up' && (
+      {currentStep !== 'sign-in' && (
         <header className="bg-slate-900 text-white py-4 px-8">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <h1 className="text-white">TPD Records Processing System</h1>
-            
+
             {/* User Profile */}
-            <div 
+            <div
               className="relative flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/50 transition-colors cursor-pointer"
               onMouseEnter={() => setShowProfileDropdown(true)}
               onMouseLeave={() => setShowProfileDropdown(false)}
@@ -552,16 +536,16 @@ export default function App() {
               <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors">
                 <User className="w-5 h-5 text-white" />
               </div>
-              <span className="text-slate-300">{currentUser.name}</span>
+              <span className="text-slate-300">{currentUser?.name}</span>
               <ChevronDown className="w-4 h-4 text-slate-400" />
               {showProfileDropdown && (
                 <div className="absolute right-0 top-[calc(100%+4px)] w-56 bg-white rounded-md shadow-lg z-10 py-1">
                   <div className="px-4 py-2 border-b border-slate-200">
-                    <p className="text-slate-900 font-medium">{currentUser.name}</p>
-                    <p className="text-slate-500 text-sm">Badge ID: {currentUser.badgeId}</p>
+                    <p className="text-slate-900 font-medium">{currentUser?.name}</p>
+                    <p className="text-slate-500 text-sm">{currentUser?.email}</p>
                   </div>
-                  <button 
-                    className="flex items-center px-4 py-2 text-red-600 hover:bg-slate-100 w-full text-left transition-colors" 
+                  <button
+                    className="flex items-center px-4 py-2 text-red-600 hover:bg-slate-100 w-full text-left transition-colors"
                     onClick={handleSignOut}
                   >
                     <LogOut className="w-4 h-4 mr-2 text-red-600" />
@@ -575,5 +559,15 @@ export default function App() {
       )}
       {renderStep()}
     </div>
+  );
+}
+
+// ─── Root export — wraps everything in AuthProvider ───────────────────────────
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }

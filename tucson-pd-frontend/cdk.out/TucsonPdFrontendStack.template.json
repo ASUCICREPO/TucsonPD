@@ -62,7 +62,7 @@
      }
     ],
     "SmsVerificationMessage": "The verification code to your new account is {####}",
-    "UserPoolName": "tucson-pd-user-pool-7802e375",
+    "UserPoolName": "tucson-pd-user-pool-dea4b775",
     "UsernameAttributes": [
      "email"
     ],
@@ -82,7 +82,7 @@
   "TucsonPdUserPoolTucsonPdCognitoDomain4E38078F": {
    "Type": "AWS::Cognito::UserPoolDomain",
    "Properties": {
-    "Domain": "tucson-pd-app-7802e375",
+    "Domain": "tucson-pd-app-dea4b775",
     "UserPoolId": {
      "Ref": "TucsonPdUserPoolE3803417"
     }
@@ -149,7 +149,7 @@
       ]
      }
     ],
-    "RoleName": "tucson-pd-post-confirmation-role-7802e375"
+    "RoleName": "tucson-pd-post-confirmation-role-dea4b775"
    },
    "Metadata": {
     "aws:cdk:path": "TucsonPdFrontendStack/PostConfirmationLambdaRole/Resource"
@@ -198,7 +198,7 @@
       "DEFAULT_GROUP": "Users"
      }
     },
-    "FunctionName": "tucson-pd-post-confirmation-7802e375",
+    "FunctionName": "tucson-pd-post-confirmation-dea4b775",
     "Handler": "post_confirmation_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -288,7 +288,7 @@
       ]
      }
     ],
-    "RoleName": "tucson-pd-admin-creator-role-7802e375"
+    "RoleName": "tucson-pd-admin-creator-role-dea4b775"
    },
    "Metadata": {
     "aws:cdk:path": "TucsonPdFrontendStack/AdminCreatorLambdaRole/Resource"
@@ -334,7 +334,7 @@
      "S3Key": "c5bfbe70e9a927367df2a07a707e5d8ee2bcc77cfc385f5e5e03d90788b4e53c.zip"
     },
     "Description": "Creates default admin user on stack creation",
-    "FunctionName": "tucson-pd-admin-creator-7802e375",
+    "FunctionName": "tucson-pd-admin-creator-dea4b775",
     "Handler": "create_admin_user_lambda.lambda_handler",
     "Role": {
      "Fn::GetAtt": [
@@ -571,13 +571,14 @@
     "AllowedOAuthScopes": [
      "openid",
      "email",
-     "profile"
+     "profile",
+     "aws.cognito.signin.user.admin"
     ],
     "CallbackURLs": [
      "http://localhost:5173",
      "https://example.com"
     ],
-    "ClientName": "tucson-pd-app-client-7802e375",
+    "ClientName": "tucson-pd-app-client-dea4b775",
     "EnableTokenRevocation": true,
     "ExplicitAuthFlows": [
      "ALLOW_USER_PASSWORD_AUTH",
@@ -629,7 +630,7 @@
       }
      ]
     },
-    "BucketName": "tucson-pd-frontend-store-7802e375",
+    "BucketName": "tucson-pd-frontend-store-dea4b775",
     "PublicAccessBlockConfiguration": {
      "BlockPublicAcls": true,
      "BlockPublicPolicy": true,
@@ -893,7 +894,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/15ab317753aa87195a519d20959783d239d649f41fc0e6d017fe2eb7018ac4a2.zip\",\"Bucket\":\"",
+       "/86e30606d0125de8c0bf9fdadc4d185e2ca68f416db4462e6925556a51d3fe6d.zip\",\"Bucket\":\"",
        {
         "Ref": "FrontendStoreBucketC891F5ED"
        },
@@ -944,7 +945,7 @@
           {
            "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
           },
-          "/15ab317753aa87195a519d20959783d239d649f41fc0e6d017fe2eb7018ac4a2.zip"
+          "/86e30606d0125de8c0bf9fdadc4d185e2ca68f416db4462e6925556a51d3fe6d.zip"
          ]
         ]
        }
@@ -1099,7 +1100,7 @@
       ]
      }
     ],
-    "RoleName": "tucson-pd-amplify-lambda-role-7802e375"
+    "RoleName": "tucson-pd-amplify-lambda-role-dea4b775"
    },
    "Metadata": {
     "aws:cdk:path": "TucsonPdFrontendStack/AmplifyDeploymentLambdaRole/Resource"
@@ -1204,7 +1205,7 @@
        "Ref": "FrontendStoreBucketC891F5ED"
       },
       "FRONTEND_FOLDER_NAME": "build/",
-      "AMPLIFY_APP_NAME": "TucsonPdApp-7802e375",
+      "AMPLIFY_APP_NAME": "TucsonPdApp-dea4b775",
       "USER_POOL_ID": {
        "Ref": "TucsonPdUserPoolE3803417"
       },
@@ -1231,7 +1232,7 @@
       }
      }
     },
-    "FunctionName": "tucson-pd-amplify-deployment-7802e375",
+    "FunctionName": "tucson-pd-amplify-deployment-dea4b775",
     "Handler": "lambda_function.lambda_handler",
     "Role": {
      "Fn::GetAtt": [

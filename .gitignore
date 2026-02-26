@@ -2,7 +2,7 @@
 /frontend/node_modules/
 
 
-
+temp.txt
 
 #Ignore development python .venv files
 /backend/lambdas/bedrock_lambda/.venv
@@ -28,4 +28,10 @@
 /tucson-pd-frontend/build.zip
 /tucson-pd-frontend/frontend/node_modules
 /tucson-pd-frontend/frontend/dist
+/tucson-pd-frontend/frontend/cognito-config.json
+
+
+# # Ignore the cdk out files
+# /tucson-pd-backend/cdk.out
+# /tucson-pd-frontend/cdk.out
 
