@@ -1,34 +1,76 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, User, FileText, Clock, CheckCircle, AlertTriangle, PlusCircle, Edit2, Trash2, Shield, Upload, ExternalLink, Download, Eye, Filter, ArrowUpDown, Loader2, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  getCasesByOfficer,
+  getOtherCases,
+  deleteCase,
+  getDownloadPresignedUrl,
+  mapBackendStatus,
+  type ApiCase,
+} from './apigatewaymanager';
 
+// Internal display shape — maps from ApiCase to what the UI expects
 interface CaseData {
-  id: string;
-  caseId: string;
+  id: string;             // maps to ApiCase.case_id
+  caseId: string;         // maps to ApiCase.case_id (display label)
   requesterName: string;
   redactionStatus: 'Not Started' | 'In Progress' | 'Review Now' | 'Completed';
-  dateCreated: string;
+  dateCreated: string;    // formatted from ApiCase.created_at
   intakeFormData?: {
     fileName?: string;
-    fileData?: string;
-    fileType?: string;
+    s3Key?: string;
   } | null;
   isMarkedComplete?: boolean;
   fileName?: string;
+  s3OriginalKey?: string;
+  s3RedactedKey?: string;
   isProcessing?: boolean;
   redactedBy?: string;
   redactedByEmail?: string;
 }
 
+// Map an ApiCase from the backend into the internal CaseData shape
+function mapApiCase(c: ApiCase): CaseData {
+  return {
+    id: c.case_id,
+    caseId: c.case_id,
+    requesterName: c.requester_name,
+    redactionStatus: mapBackendStatus(c.status),
+    dateCreated: new Date(c.created_at * 1000).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    intakeFormData: c.s3_paths?.intake_form
+      ? { fileName: 'Intake Form', s3Key: c.s3_paths.intake_form }
+      : null,
+    isMarkedComplete: c.status === 'COMPLETED' || c.status === 'CLOSED',
+    fileName: c.s3_paths?.unredacted_doc?.split('/').pop(),
+    s3OriginalKey: c.s3_paths?.unredacted_doc ?? undefined,
+    s3RedactedKey: c.s3_paths?.redacted_doc ?? undefined,
+    isProcessing: c.status === 'PROCESSING' || c.status === 'APPLYING_REDACTIONS',
+    redactedBy: c.officer_name,
+    redactedByEmail: c.officer_id,
+  };
+}
+
 interface DashboardScreenProps {
   onStartNewCase: () => void;
   onViewCase: (caseId: string) => void;
-  cases: CaseData[];
-  onUpdateCases: (cases: CaseData[]) => void;
   currentUserEmail: string;
+  currentOfficerId: string;
 }
 
-export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCases, currentUserEmail }: DashboardScreenProps) {
+export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, currentOfficerId }: DashboardScreenProps) {
+  // ── API-driven case state ──────────────────────────────────────────────────
+  const [myCases, setMyCases] = useState<CaseData[]>([]);
+  const [otherCases, setOtherCases] = useState<CaseData[]>([]);
+  const [isLoadingMy, setIsLoadingMy] = useState(true);
+  const [isLoadingOther, setIsLoadingOther] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // ── UI state ───────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<keyof CaseData | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -44,6 +86,44 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
   const sortDropdownRef = useRef<HTMLDivElement>(null);
   const redactedByDropdownRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'my' | 'other'>('my');
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
+
+  const fetchMyCases = useCallback(async () => {
+    setIsLoadingMy(true);
+    const { data, error } = await getCasesByOfficer(currentOfficerId);
+    if (error) {
+      setFetchError(error);
+      toast.error('Failed to load your cases', { description: error });
+    } else {
+      setMyCases((data ?? []).map(mapApiCase));
+      setFetchError(null);
+    }
+    setIsLoadingMy(false);
+  }, [currentOfficerId]);
+
+  const fetchOtherCases = useCallback(async () => {
+    setIsLoadingOther(true);
+    const { data, error } = await getOtherCases(currentOfficerId);
+    if (error) {
+      toast.error('Failed to load other cases', { description: error });
+    } else {
+      setOtherCases((data ?? []).map(mapApiCase));
+    }
+    setIsLoadingOther(false);
+  }, [currentOfficerId]);
+
+  // Fetch both tabs on mount
+  useEffect(() => {
+    fetchMyCases();
+    fetchOtherCases();
+  }, [fetchMyCases, fetchOtherCases]);
+
+  // Derive the combined list for metric cards (all cases this user can see)
+  const allCases = [...myCases, ...otherCases];
+
+  // The active set shown in the table depends on which tab is selected
+  const cases = activeTab === 'my' ? myCases : otherCases;
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -84,10 +164,10 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
     }
   };
 
-  // Get unique list of officers who have redacted cases
+  // Get unique list of officers from the other-cases tab for the filter dropdown
   const getUniqueOfficers = () => {
     const officers = new Map<string, string>();
-    cases.forEach(c => {
+    otherCases.forEach(c => {
       if (c.redactedBy && c.redactedByEmail) {
         officers.set(c.redactedByEmail, c.redactedBy);
       }
@@ -103,13 +183,13 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
     return officer ? officer.name : 'All Officers';
   };
 
-  // Track when processing completes and show toast notification
+  // Track when processing completes on MY cases and show toast notification
   useEffect(() => {
-    const currentProcessing = new Set(cases.filter(c => c.isProcessing).map(c => c.id));
+    const currentProcessing = new Set(myCases.filter(c => c.isProcessing).map(c => c.id));
     const previousProcessing = previousProcessingRef.current;
 
     // Find cases that were processing but now are not (just completed)
-    const completedCases = cases.filter(c => 
+    const completedCases = myCases.filter(c => 
       previousProcessing.has(c.id) && 
       !currentProcessing.has(c.id) &&
       c.redactionStatus === 'Review Now'
@@ -140,7 +220,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
     });
 
     previousProcessingRef.current = currentProcessing;
-  }, [cases, onViewCase]);
+  }, [myCases, onViewCase]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -162,68 +242,74 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
     }
   };
 
-  const handleDelete = (caseId: string) => {
-    if (confirm(`Are you sure you want to delete case ${caseId}?`)) {
-      onUpdateCases(cases.filter(c => c.id !== caseId));
+  const handleDelete = async (caseId: string, displayId: string) => {
+    if (!confirm(`Are you sure you want to delete case ${displayId}?`)) return;
+    const { error } = await deleteCase(caseId);
+    if (error) {
+      toast.error(`Failed to delete case ${displayId}`, { description: error });
+    } else {
+      // Optimistically remove from local state
+      setMyCases(prev => prev.filter(c => c.id !== caseId));
+      setOtherCases(prev => prev.filter(c => c.id !== caseId));
+      toast.success(`Case ${displayId} deleted`);
     }
   };
 
-  const handleViewIntakeForm = (caseData: CaseData) => {
-    if (caseData.intakeFormData?.fileData) {
-      // Create a blob from the base64 data and open in new tab
-      const byteCharacters = atob(caseData.intakeFormData.fileData.split(',')[1]);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: caseData.intakeFormData.fileType || 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+  const handleViewIntakeForm = async (caseData: CaseData) => {
+    const { data, error } = await getDownloadPresignedUrl(
+      caseData.id,
+      'intake_form',
+    );
+    if (error || !data) {
+      toast.error('Could not retrieve intake form', { description: error ?? 'Unknown error' });
+      return;
     }
+    window.open(data, '_blank');
   };
 
-  const handleDownloadRedactedDocument = (caseData: CaseData) => {
-    // Simulate downloading the redacted document
-    alert(`Downloading redacted document for ${caseData.caseId}`);
-  };
-
-  const handleDownloadUnredactedDocument = (caseData: CaseData) => {
-    if (caseData.fileData && caseData.fileName) {
-      // Create a blob from the base64 data and trigger download
-      const byteCharacters = atob(caseData.fileData.split(',')[1]);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: caseData.fileType || 'application/pdf' });
-      
-      // Create download link and trigger download
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = caseData.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+  const handleDownloadRedactedDocument = async (caseData: CaseData) => {
+    const { data, error } = await getDownloadPresignedUrl(
+      caseData.id,
+      'redacted_doc',
+    );
+    if (error || !data) {
+      toast.error('Could not retrieve redacted document', { description: error ?? 'Unknown error' });
+      return;
     }
+    const link = document.createElement('a');
+    link.href = data;
+    link.download = caseData.fileName
+      ? caseData.fileName.replace('_Unredacted', '_Redacted')
+      : 'redacted_document.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  // Filter by search query and status
+  const handleDownloadUnredactedDocument = async (caseData: CaseData) => {
+    const { data, error } = await getDownloadPresignedUrl(
+      caseData.id,
+      'unredacted_doc',
+    );
+    if (error || !data) {
+      toast.error('Could not retrieve original document', { description: error ?? 'Unknown error' });
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = data;
+    link.download = caseData.fileName ?? 'original_document.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Filter the active tab's cases by search query, status, and officer
   let filteredCases = cases.filter(c => {
     const matchesSearch = c.caseId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.requesterName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.redactionStatus === statusFilter;
-    const matchesRedactedBy = redactedByFilter === 'all' || c.redactedByEmail === redactedByFilter;
-    
-    // Filter by tab
-    if (activeTab === 'my') {
-      return matchesSearch && matchesStatus && c.redactedByEmail === currentUserEmail;
-    } else {
-      return matchesSearch && matchesStatus && matchesRedactedBy && c.redactedByEmail !== currentUserEmail;
-    }
+    const matchesRedactedBy = activeTab === 'my' || redactedByFilter === 'all' || c.redactedByEmail === redactedByFilter;
+    return matchesSearch && matchesStatus && matchesRedactedBy;
   });
 
   // Sort cases based on sortBy dropdown
@@ -251,10 +337,10 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
     return aVal < bVal ? -modifier : modifier;
   });
 
-  // Calculate metrics
-  const totalCases = cases.length;
-  const processingCases = cases.filter(c => c.isProcessing).length;
-  const completedRedaction = cases.filter(c => c.redactionStatus === 'Completed').length;
+  // Calculate metrics across all visible cases
+  const totalCases = allCases.length;
+  const processingCases = allCases.filter(c => c.isProcessing).length;
+  const completedRedaction = allCases.filter(c => c.redactionStatus === 'Completed').length;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -267,7 +353,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
               <h2 className="text-slate-900 mb-1">Dashboard</h2>
               <p className="text-slate-600">Manage and monitor records processing requests</p>
             </div>
-            {cases.length > 0 && (
+            {myCases.length > 0 && (
               <button
                 onClick={onStartNewCase}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -314,8 +400,25 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
             </div>
           </div>
 
-          {/* Conditional Content: Show placeholder if no cases, otherwise show search and table */}
-          {cases.length === 0 ? (
+          {/* Conditional Content: loading, error, empty, or table */}
+          {(isLoadingMy && activeTab === 'my') || (isLoadingOther && activeTab === 'other') ? (
+            <div className="bg-white rounded-lg shadow-md border border-slate-200 p-16 text-center">
+              <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
+              <p className="text-slate-600">Loading cases...</p>
+            </div>
+          ) : fetchError ? (
+            <div className="bg-white rounded-lg shadow-md border border-slate-200 p-16 text-center">
+              <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+              <p className="text-slate-900 font-medium mb-2">Failed to load cases</p>
+              <p className="text-slate-500 mb-6">{fetchError}</p>
+              <button
+                onClick={() => { fetchMyCases(); fetchOtherCases(); }}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : myCases.length === 0 && otherCases.length === 0 ? (
             // Empty State Placeholder
             <div className="bg-white rounded-lg shadow-md border border-slate-200 p-16">
               <div className="max-w-md mx-auto text-center">
@@ -633,7 +736,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
                       {sortedCases.map((caseData) => {
                         const isNewlyReady = newlyReadyForReview.has(caseData.id) && caseData.redactionStatus === 'Review Now' && !caseData.isProcessing;
                         const isReviewNow = caseData.redactionStatus === 'Review Now' && !caseData.isProcessing;
-                        const isCurrentUserCase = caseData.redactedByEmail === currentUserEmail;
+                        const isCurrentUserCase = caseData.redactedByEmail === currentOfficerId;
                         return (
                           <tr 
                             key={caseData.id} 
@@ -644,7 +747,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
                             }`}
                           >
                             <td className="px-6 py-4">
-                              {caseData.fileName && caseData.fileData ? (
+                              {caseData.fileName && caseData.s3OriginalKey ? (
                                 <button
                                   onClick={() => handleDownloadUnredactedDocument(caseData)}
                                   className="text-blue-600 hover:text-blue-800 hover:underline transition-colors flex items-center gap-1"
@@ -695,7 +798,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
                               )}
                             </td>
                             <td className="px-6 py-4">
-                              {caseData.isMarkedComplete ? (
+                              {caseData.isMarkedComplete && caseData.s3RedactedKey ? (
                                 <button
                                   onClick={() => handleDownloadRedactedDocument(caseData)}
                                   className="text-blue-600 hover:text-blue-800 hover:underline transition-colors flex items-center gap-1"
@@ -729,7 +832,14 @@ export function DashboardScreen({ onStartNewCase, onViewCase, cases, onUpdateCas
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-center gap-2">
                                 <button
-                                  onClick={() => handleDelete(caseData.id)}
+                                  onClick={() => onViewCase(caseData.caseId)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Open case"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(caseData.id, caseData.caseId)}
                                   className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
                                   title="Delete case"
                                 >

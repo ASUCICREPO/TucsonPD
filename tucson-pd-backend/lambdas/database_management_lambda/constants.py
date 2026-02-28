@@ -52,7 +52,7 @@ if not BEDROCK_LAMBDA_NAME:
     raise ValueError("BEDROCK_LAMBDA_NAME environment variable is required")
 
 # AWS Region
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
 
 
 # ============================================================================

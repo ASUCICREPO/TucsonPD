@@ -253,6 +253,59 @@ def delete_dynamodb_item(case_id: str) -> None:
         raise
 
 
+def scan_all_cases(limit: int = 100) -> List[Dict[str, Any]]:
+    """
+    Scan all cases from DynamoDB, used for the "Other Redactions" tab
+    where we need every case that doesn't belong to the requesting officer.
+    
+    Pagination is handled automatically up to the limit.
+    
+    Args:
+        limit: Maximum total number of cases to return
+        
+    Returns:
+        List of all case items up to the limit
+        
+    Raises:
+        ClientError: If DynamoDB scan fails
+    """
+    logger.info(f"Scanning all cases (limit: {limit})")
+    
+    try:
+        items = []
+        scan_kwargs = {}
+        
+        while True:
+            response = dynamodb_table.scan(**scan_kwargs)
+            batch = response.get('Items', [])
+            items.extend(batch)
+            
+            # Stop if we've hit the limit or there are no more pages
+            if len(items) >= limit or 'LastEvaluatedKey' not in response:
+                break
+            
+            # Set up next page
+            scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+        
+        # Trim to limit and convert Decimal types
+        items = items[:limit]
+        items = json.loads(json.dumps(items, default=decimal_default))
+        
+        # Sort most recent first
+        items.sort(key=lambda x: x.get('created_at', 0), reverse=True)
+        
+        logger.info(f"Scan returned {len(items)} cases")
+        return items
+        
+    except ClientError as e:
+        logger.error(f"Failed to scan cases table")
+        logger.error(f"Error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error scanning cases: {e}")
+        raise
+
+
 # ============================================================================
 # DYNAMODB FUNCTIONS - GUIDELINES
 # ============================================================================

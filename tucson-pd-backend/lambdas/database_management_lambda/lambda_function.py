@@ -78,25 +78,32 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         path_parameters = event.get('pathParameters') or {}
         query_parameters = event.get('queryStringParameters') or {}
         
-        # Extract officer_id from authorizer context (Cognito)
-        # For testing: fallback to request body if no Cognito TODO Fix this for actual auth
+        # Extract officer identity — try Cognito authorizer first, fall back to
+        # query params or request body (API Gateway has no authorizer configured;
+        # identity is passed explicitly by the authenticated frontend)
         authorizer_claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})
         officer_id = authorizer_claims.get('sub')
         officer_name = authorizer_claims.get('name', 'Unknown Officer')
         is_admin = 'admin' in authorizer_claims.get('cognito:groups', '').lower()
 
-        # TESTING FALLBACK: If no Cognito, read from request body
         if not officer_id:
-            try:
-                body = parse_request_body(event) if event.get('body') else {}
-                officer_id = body.get('officer_id', 'test-officer-123')
-                officer_name = body.get('officer_name', 'Test Officer')
-                is_admin = body.get('is_admin', False)
-                logger.info(f"Using officer_id from request body (testing mode): {officer_id}")
-            except:
-                # If parsing fails, use defaults
-                officer_id = 'test-officer-123'
-                officer_name = 'Test Officer'
+            # Read identity from query params (GET requests) or request body (POST/PUT)
+            officer_id = query_parameters.get('officer_id')
+            if not officer_id and event.get('body'):
+                try:
+                    body_peek = parse_request_body(event)
+                    officer_id = body_peek.get('officer_id')
+                    officer_name = body_peek.get('officer_name', officer_name)
+                    is_admin = body_peek.get('is_admin', is_admin)
+                except Exception:
+                    pass
+
+        if not officer_id:
+            logger.warning("Request received with no officer_id")
+            return build_api_response(401, {
+                "error": "Unauthorized",
+                "message": "officer_id is required"
+            }, error=True)
         
         logger.info(f"Request: {http_method} {path}")
         logger.info(f"Officer ID: {officer_id}, Is Admin: {is_admin}")
@@ -118,7 +125,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         elif http_method == 'GET' and path == '/cases':
             status_filter = query_parameters.get('status')
             limit = int(query_parameters.get('limit', 50))
-            return handle_list_cases(officer_id, status_filter, limit)
+            exclude_officer_id = query_parameters.get('exclude_officer_id')
+            return handle_list_cases(officer_id, status_filter, limit, exclude_officer_id)
         
         # PUT /cases/{case_id}/status - Update case status
         elif http_method == 'PUT' and path.endswith('/status') and path_parameters.get('case_id'):
@@ -251,11 +259,11 @@ def handle_get_case(case_id: str, officer_id: str) -> Dict[str, Any]:
     })
 
 
-def handle_list_cases(officer_id: str, status_filter: str, limit: int) -> Dict[str, Any]:
+def handle_list_cases(officer_id: str, status_filter: str, limit: int, exclude_officer_id: str = None) -> Dict[str, Any]:
     """Handle GET /cases - List cases"""
-    logger.info(f"Listing cases for officer: {officer_id}, status filter: {status_filter}")
+    logger.info(f"Listing cases for officer: {officer_id}, status filter: {status_filter}, exclude: {exclude_officer_id}")
     
-    cases = list_cases(officer_id=officer_id, status=status_filter, limit=limit)
+    cases = list_cases(officer_id=officer_id, status=status_filter, limit=limit, exclude_officer_id=exclude_officer_id)
     
     return build_api_response(200, {
         "success": True,
@@ -354,10 +362,8 @@ def handle_generate_download_url(body: Dict[str, Any], officer_id: str) -> Dict[
     case_id = body['case_id']
     file_type = body['file_type']
     
-    # Verify officer owns this case
-    case = get_case(case_id)
-    if case['officer_id'] != officer_id:
-        raise PermissionError("You do not have permission to download from this case")
+    # Verify case exists (no ownership check — officers can view each other's work)
+    get_case(case_id)
     
     # Generate pre-signed URL
     download_url = generate_download_url(case_id, file_type)

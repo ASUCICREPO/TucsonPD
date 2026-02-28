@@ -6,6 +6,14 @@ import { ProcessingLoader } from './processing-loader';
 import { DocumentViewer } from './document-viewer';
 import { IntakeFormData } from './intake-form-screen';
 import { CaseStepper } from './case-stepper';
+import { toast } from 'sonner';
+import {
+  getUploadPresignedUrl,
+  uploadFileToS3,
+  updateCaseS3Path,
+  updateCaseStatus,
+  getCaseById,
+} from './apigatewaymanager';
 
 interface CaseDetailScreenProps {
   caseData: {
@@ -144,30 +152,29 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
     totalRedactions: 30
   };
 
-  // Simulate analysis progress
+  // Poll backend status while in the analyzing stage
   useEffect(() => {
-    if (redactionStage === 'analyzing') {
-      const interval = setInterval(() => {
-        setAnalysisProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setTimeout(() => {
-              setRedactionStage('rules-review');
-              // Save state when transitioning to rules-review
-              onUpdateCase({
-                ...caseData,
-                redactionStage: 'rules-review' as const
-              });
-            }, 500);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 200);
+    if (redactionStage !== 'analyzing') return;
 
-      return () => clearInterval(interval);
-    }
-  }, [redactionStage]);
+    const interval = setInterval(async () => {
+      const { data } = await getCaseById(caseData.id);
+      if (!data) return;
+
+      if (data.status === 'REVIEW_READY' || data.status === 'REVIEWING') {
+        clearInterval(interval);
+        setRedactionStage('rules-review');
+      } else if (data.status === 'FAILED') {
+        clearInterval(interval);
+        toast.error('AI processing failed', { description: 'Please try uploading the document again.' });
+        setRedactionStage('upload');
+        setUploadStatus('ready');
+      }
+      // Keep a slow visual progress tick so the UI doesn't look frozen
+      setAnalysisProgress(prev => Math.min(prev + 5, 90));
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [redactionStage, caseData.id]);
 
   // Simulate redaction processing
   useEffect(() => {
@@ -267,55 +274,58 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
     }
   };
 
-  const handleSubmitRedaction = () => {
-    if (selectedFile) {
-      // Convert file to base64 for storage
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const fileData = reader.result as string;
-        
-        // Add case to dashboard with "isProcessing: true" when starting redaction
-        if (isNewCase) {
-          const permanentCase = {
-            ...caseData,
-            id: caseData.id.replace('temp-', ''),
-            caseId: caseNumber,
-            requesterName: requesterName,
-            redactionStatus: 'In Progress' as const,
-            redactionStage: 'analyzing' as const,
-            fileName: selectedFile.name,
-            fileData: fileData,
-            fileType: selectedFile.type,
-            fileSize: selectedFile.size,
-            caseNumber: caseNumber,
-            redactionCategory: redactionCategory,
-            isConfirmed: false,
-            isMarkedComplete: false,
-            isProcessing: true // Mark as processing for background handling
-          };
-          onAddCase(permanentCase);
-        } else {
-          onUpdateCase({
-            ...caseData,
-            caseId: caseNumber,
-            requesterName: requesterName,
-            redactionStatus: 'In Progress',
-            redactionStage: 'analyzing' as const,
-            fileName: selectedFile.name,
-            fileData: fileData,
-            fileType: selectedFile.type,
-            fileSize: selectedFile.size,
-            caseNumber: caseNumber,
-            redactionCategory: redactionCategory,
-            isConfirmed: false,
-            isProcessing: true // Mark as processing for background handling
-          });
+  const handleSubmitRedaction = async () => {
+    if (!selectedFile) return;
+
+    const caseId = caseData.id;
+
+    try {
+      // Step 1: Get presigned upload URL
+      toast.loading('Preparing upload...', { id: 'upload' });
+      const { data: presignedData, error: presignedError } = await getUploadPresignedUrl(caseId, 'unredacted_doc');
+      if (presignedError || !presignedData) {
+        toast.error('Failed to prepare upload', { id: 'upload', description: presignedError ?? 'Unknown error' });
+        return;
+      }
+
+      // Step 2: Upload file directly to S3
+      toast.loading('Uploading document...', { id: 'upload' });
+      const { error: uploadError } = await uploadFileToS3(
+        presignedData.upload_url,
+        presignedData.fields,
+        selectedFile,
+        (percent) => {
+          if (percent < 100) toast.loading(`Uploading... ${percent}%`, { id: 'upload' });
         }
-      };
-      reader.readAsDataURL(selectedFile);
-      
+      );
+      if (uploadError) {
+        toast.error('Upload failed', { id: 'upload', description: uploadError });
+        return;
+      }
+
+      // Step 3: Record S3 path on the case
+      const { error: pathError } = await updateCaseS3Path(caseId, 'unredacted_doc', presignedData.s3_path);
+      if (pathError) {
+        toast.error('Failed to record upload', { id: 'upload', description: pathError });
+        return;
+      }
+
+      // Step 4: Update status to UNREDACTED_UPLOADED — this triggers the Bedrock Lambda
+      const { error: statusError } = await updateCaseStatus(caseId, 'UNREDACTED_UPLOADED');
+      if (statusError) {
+        toast.error('Failed to start processing', { id: 'upload', description: statusError });
+        return;
+      }
+
+      toast.success('Document uploaded — AI analysis started', { id: 'upload' });
+
+      // Transition UI to the analyzing/polling stage
       setAnalysisProgress(0);
       setRedactionStage('analyzing');
+
+    } catch (err) {
+      toast.error('Unexpected error during upload', { id: 'upload' });
+      console.error(err);
     }
   };
 

@@ -10,6 +10,7 @@ import { ReviewExtractedRules } from './components/review-extracted-rules';
 import { GuidelineSavedConfirmation } from './components/guideline-saved-confirmation';
 import { User, LogOut, ChevronDown } from 'lucide-react';
 import { Toaster } from "sonner";
+import { setOfficerIdentity, getCaseById, mapBackendStatus } from './components/apigatewaymanager';
 
 type FlowStep = 'sign-in' | 'dashboard' | 'intake-form' | 'case-detail' | 'admin-dashboard' | 'upload-guideline' | 'review-rules' | 'guideline-saved';
 
@@ -22,6 +23,7 @@ function AppInner() {
 
   const [currentStep, setCurrentStep] = useState<FlowStep>('sign-in');
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedCaseData, setSelectedCaseData] = useState<any | null>(null);
   const [isNewCase, setIsNewCase] = useState(false);
   const [intakeFormData, setIntakeFormData] = useState<IntakeFormData | null>(null);
   const [uploadedGuidelineFile, setUploadedGuidelineFile] = useState<File | null>(null);
@@ -33,6 +35,16 @@ function AppInner() {
   } | null>(null);
   const [shouldActivateGuideline, setShouldActivateGuideline] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+
+  // Populate API identity whenever Cognito auth resolves
+  useEffect(() => {
+    if (currentUser?.sub) {
+      setOfficerIdentity({
+        officer_id: currentUser.sub,
+        officer_name: currentUser.name,
+      });
+    }
+  }, [currentUser]);
 
   // Track active processing timers to avoid creating duplicate timers
   const activeTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -253,13 +265,16 @@ function AppInner() {
     }
   ]);
 
-  const handleViewCase = (caseId: string) => {
-    const caseToView = cases.find(c => c.caseId === caseId);
-    if (caseToView) {
-      setSelectedCaseId(caseToView.id);
-      setIsNewCase(false);
-      setCurrentStep('case-detail');
+  const handleViewCase = async (caseId: string) => {
+    const { data, error } = await getCaseById(caseId);
+    if (error || !data) {
+      console.error('Failed to load case:', error);
+      return;
     }
+    setSelectedCaseId(data.case_id);
+    setSelectedCaseData(data);
+    setIsNewCase(false);
+    setCurrentStep('case-detail');
   };
 
   const handleUpdateCase = (updatedCase: any) => {
@@ -346,6 +361,37 @@ function AppInner() {
     );
   }
 
+  // Map a real ApiCase into the shape CaseDetailScreen expects
+  const apiCaseToDetailShape = (apiCase: any) => {
+    const statusMap: Record<string, 'upload' | 'analyzing' | 'rules-review' | 'processing' | 'complete'> = {
+      CASE_CREATED:        'upload',
+      INTAKE_UPLOADED:     'upload',
+      UNREDACTED_UPLOADED: 'analyzing',
+      PROCESSING:          'analyzing',
+      REVIEW_READY:        'rules-review',
+      REVIEWING:           'rules-review',
+      APPLYING_REDACTIONS: 'processing',
+      COMPLETED:           'complete',
+      CLOSED:              'complete',
+      FAILED:              'upload',
+    };
+    return {
+      id:              apiCase.case_id,
+      caseId:          apiCase.case_id,
+      requesterName:   apiCase.requester_name ?? '',
+      redactionStatus: mapBackendStatus(apiCase.status),
+      dateCreated:     new Date(apiCase.created_at * 1000).toLocaleDateString('en-US', {
+                         month: 'short', day: 'numeric', year: 'numeric'
+                       }),
+      redactionStage:  statusMap[apiCase.status] ?? 'upload',
+      fileName:        apiCase.s3_paths?.unredacted_doc?.split('/').pop() ?? undefined,
+      isMarkedComplete: apiCase.status === 'COMPLETED' || apiCase.status === 'CLOSED',
+      intakeFormData:  apiCase.s3_paths?.intake_form
+                         ? { fileName: 'Intake Form', s3Key: apiCase.s3_paths.intake_form }
+                         : null,
+    };
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 'sign-in':
@@ -355,9 +401,8 @@ function AppInner() {
           <DashboardScreen
             onStartNewCase={handleStartNewCase}
             onViewCase={handleViewCase}
-            cases={cases}
-            onUpdateCases={setCases}
             currentUserEmail={currentUser?.email ?? ''}
+            currentOfficerId={currentUser?.sub ?? ''}
           />
         );
       case 'intake-form':
@@ -398,7 +443,7 @@ function AppInner() {
           );
         }
 
-        const selectedCase = cases.find(c => c.id === selectedCaseId);
+        const selectedCase = selectedCaseData ? apiCaseToDetailShape(selectedCaseData) : null;
         if (!selectedCase) {
           setCurrentStep('dashboard');
           return null;

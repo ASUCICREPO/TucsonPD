@@ -31,7 +31,7 @@ temp.txt
 /tucson-pd-frontend/frontend/cognito-config.json
 
 
-# # Ignore the cdk out files
-# /tucson-pd-backend/cdk.out
-# /tucson-pd-frontend/cdk.out
+# Ignore the cdk out files
+/tucson-pd-backend/cdk.out
+/tucson-pd-frontend/cdk.out
 

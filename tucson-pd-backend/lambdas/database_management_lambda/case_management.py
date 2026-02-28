@@ -15,14 +15,17 @@ from utils import (
     get_dynamodb_item,
     put_dynamodb_item,
     update_dynamodb_item,
+    delete_dynamodb_item,
+    delete_s3_object,
     query_dynamodb_by_index,
+    scan_all_cases,
     invoke_bedrock_lambda,
     build_s3_path
 )
 from constants import (
     STATUS_CASE_CREATED,
     STATUS_UNREDACTED_UPLOADED,
-    STATUS_REVIEWING
+    STATUS_APPLYING_REDACTIONS,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,26 +33,24 @@ logger = logging.getLogger(__name__)
 
 def create_case(officer_id: str, officer_name: str) -> Dict[str, Any]:
     """
-    Create a new redaction case
-    
+    Create a new redaction case.
+
     Args:
         officer_id: Cognito user ID of the officer
         officer_name: Display name of the officer
-        
+
     Returns:
         Dictionary containing the created case object
-        
+
     Raises:
         Exception: If DynamoDB operation fails
     """
     logger.info(f"Creating new case for officer: {officer_id}")
-    
+
     try:
-        # Generate unique case ID
         case_id = generate_case_id()
         timestamp = get_current_timestamp()
-        
-        # Build case item
+
         case_item = {
             'case_id': case_id,
             'officer_id': officer_id,
@@ -75,13 +76,12 @@ def create_case(officer_id: str, officer_name: str) -> Dict[str, Any]:
                 'last_error_timestamp': None
             }
         }
-        
-        # Save to DynamoDB
+
         put_dynamodb_item(case_item)
-        
+
         logger.info(f"Successfully created case: {case_id}")
         return case_item
-        
+
     except Exception as e:
         logger.error(f"Failed to create case: {str(e)}", exc_info=True)
         raise
@@ -89,29 +89,29 @@ def create_case(officer_id: str, officer_name: str) -> Dict[str, Any]:
 
 def get_case(case_id: str) -> Dict[str, Any]:
     """
-    Retrieve a case by ID
-    
+    Retrieve a case by ID.
+
     Args:
         case_id: Unique case identifier
-        
+
     Returns:
         Dictionary containing the case object
-        
+
     Raises:
         ValueError: If case not found
         Exception: If DynamoDB operation fails
     """
     logger.info(f"Retrieving case: {case_id}")
-    
+
     try:
         case = get_dynamodb_item(case_id)
-        
+
         if not case:
             raise ValueError(f"Case not found: {case_id}")
-        
+
         logger.info(f"Successfully retrieved case: {case_id}")
         return case
-        
+
     except ValueError:
         raise
     except Exception as e:
@@ -122,41 +122,60 @@ def get_case(case_id: str) -> Dict[str, Any]:
 def list_cases(
     officer_id: str,
     status: Optional[str] = None,
-    limit: int = 50
+    limit: int = 50,
+    exclude_officer_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    List cases for an officer, optionally filtered by status
-    
+    List cases for an officer, or all cases excluding a specific officer.
+
+    When exclude_officer_id is provided, returns all cases NOT belonging to
+    that officer — used to populate the "Other Redactions" tab on the dashboard.
+    When called normally (no exclusion), returns only the calling officer's cases
+    via the officer-index GSI.
+
     Args:
-        officer_id: Cognito user ID to filter by (as string)
-        status: Optional status filter
+        officer_id: Cognito user ID of the requesting officer
+        status: Optional status filter (raw backend constant e.g. 'REVIEW_READY')
         limit: Maximum number of cases to return
-        
+        exclude_officer_id: If provided, return all cases except this officer's
+
     Returns:
         List of case dictionaries
-        
+
     Raises:
         Exception: If DynamoDB query fails
     """
-    logger.info(f"Listing cases for officer: {officer_id}, status: {status}, limit: {limit}")
-    
-    # Ensure officer_id is a string
-    officer_id = str(officer_id)
-    
+    logger.info(
+        f"Listing cases — officer: {officer_id}, status: {status}, "
+        f"limit: {limit}, exclude: {exclude_officer_id}"
+    )
+
     try:
-        if status:
-            # Query by status first, then filter by officer
-            # This is less efficient but handles the query pattern
-            cases = query_dynamodb_by_index('status-index', 'status', status, limit=limit)
-            # Filter to only cases owned by this officer
-            cases = [case for case in cases if case.get('officer_id') == officer_id]
+        if exclude_officer_id:
+            # "Other Redactions" tab — scan all cases and exclude the requesting officer
+            logger.info(f"Fetching all cases excluding officer: {exclude_officer_id}")
+            cases = scan_all_cases(limit=limit)
+            cases = [c for c in cases if c.get('officer_id') != exclude_officer_id]
+
+            if status:
+                cases = [c for c in cases if c.get('status') == status]
+
+        elif status:
+            # Query by status GSI, then filter to this officer
+            cases = query_dynamodb_by_index(
+                'status-index', 'status', status, limit=limit
+            )
+            cases = [c for c in cases if c.get('officer_id') == str(officer_id)]
+
         else:
-            # Query by officer_id using officer-index
-            cases = query_dynamodb_by_index('officer-index', 'officer_id', officer_id, limit=limit)
-        
+            # Default: query officer's own cases via officer-index GSI
+            cases = query_dynamodb_by_index(
+                'officer-index', 'officer_id', str(officer_id), limit=limit
+            )
+
         logger.info(f"Found {len(cases)} cases")
         return cases
-        
+
     except Exception as e:
         logger.error(f"Failed to list cases: {str(e)}", exc_info=True)
         raise
@@ -168,66 +187,61 @@ def update_case_status(
     metadata: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Update case status and optionally trigger Bedrock Lambda
-    
+    Update case status, optionally update metadata counters, and trigger
+    the Bedrock Lambda when the transition requires it.
+
+    Trigger rules:
+      UNREDACTED_UPLOADED  → Bedrock action="process"  (generate redaction proposals)
+      APPLYING_REDACTIONS  → Bedrock action="apply"    (apply approved redactions)
+
     Args:
         case_id: Unique case identifier
-        new_status: New status value
-        metadata: Optional metadata to merge into case
-        
+        new_status: New status value (raw backend constant)
+        metadata: Optional metadata fields to merge (e.g. total_pages)
+
     Returns:
         Updated case object
-        
+
     Raises:
-        ValueError: If case not found or invalid status
-        Exception: If update fails
+        ValueError: If case not found
+        Exception: If update or Lambda invocation fails
     """
     logger.info(f"Updating case {case_id} status to: {new_status}")
-    
+
     try:
-        # Get current case
         case = get_case(case_id)
         current_status = case['status']
-        
-        # Build update expression
+
         timestamp = get_current_timestamp()
-        update_values = {
+        update_values: Dict[str, Any] = {
             'status': new_status,
             'updated_at': timestamp
         }
-        
-        # Merge metadata if provided
+
         if metadata:
             for key, value in metadata.items():
                 update_values[f'metadata.{key}'] = value
-        
-        # Update DynamoDB
+
         update_dynamodb_item(case_id, update_values)
-        
-        # Get updated case for return and for triggering
+
+        # Re-fetch so we have the full updated record before deciding to trigger
         updated_case = get_case(case_id)
-        
-        # Determine if we should trigger Bedrock Lambda
+
         should_trigger, action = should_trigger_bedrock_lambda(current_status, new_status)
-        
+
         if should_trigger:
             logger.info(f"Triggering Bedrock Lambda with action: {action}")
-            
-            # Build S3 paths for Bedrock Lambda
             s3_paths = build_s3_paths_for_bedrock(case_id, updated_case)
-            
-            # Invoke Bedrock Lambda asynchronously
             invoke_bedrock_lambda(
                 action=action,
                 case_id=case_id,
                 s3_paths=s3_paths
             )
-            
             logger.info(f"Successfully triggered Bedrock Lambda for case: {case_id}")
-        
+
         logger.info(f"Successfully updated case {case_id} to status: {new_status}")
         return updated_case
-        
+
     except ValueError:
         raise
     except Exception as e:
@@ -241,47 +255,52 @@ def update_case_s3_path(
     s3_path: str
 ) -> Dict[str, Any]:
     """
-    Update a specific S3 path in the case record
-    
+    Update a specific S3 path in the case record.
+
     Args:
         case_id: Unique case identifier
-        path_type: Type of path (intake_form, unredacted_doc, etc.)
-        s3_path: Full S3 path
-        
+        path_type: Key within s3_paths (intake_form | unredacted_doc |
+                   redaction_proposals | edited_redactions | redacted_doc)
+        s3_path: Full S3 path (s3://bucket/key)
+
     Returns:
         Updated case object
-        
+
     Raises:
-        ValueError: If case not found or invalid path_type
+        ValueError: If case not found or path_type is invalid
         Exception: If update fails
     """
     logger.info(f"Updating S3 path for case {case_id}: {path_type} = {s3_path}")
-    
-    # Validate path_type
-    valid_path_types = ['intake_form', 'unredacted_doc', 'redaction_proposals', 
-                       'edited_redactions', 'redacted_doc']
+
+    valid_path_types = [
+        'intake_form',
+        'unredacted_doc',
+        'redaction_proposals',
+        'edited_redactions',
+        'redacted_doc',
+    ]
     if path_type not in valid_path_types:
-        raise ValueError(f"Invalid path_type: {path_type}. Must be one of {valid_path_types}")
-    
+        raise ValueError(
+            f"Invalid path_type: {path_type}. Must be one of {valid_path_types}"
+        )
+
     try:
-        # Verify case exists
-        case = get_case(case_id)
-        
-        # Update S3 path
+        # Verify case exists before updating
+        get_case(case_id)
+
         timestamp = get_current_timestamp()
         update_values = {
             f's3_paths.{path_type}': s3_path,
             'updated_at': timestamp
         }
-        
+
         update_dynamodb_item(case_id, update_values)
-        
-        # Get and return updated case
+
         updated_case = get_case(case_id)
-        
+
         logger.info(f"Successfully updated S3 path for case: {case_id}")
         return updated_case
-        
+
     except ValueError:
         raise
     except Exception as e:
@@ -291,42 +310,42 @@ def update_case_s3_path(
 
 def delete_case(case_id: str) -> None:
     """
-    Delete a case and its associated S3 files
-    
+    Delete a case record and all its associated S3 files.
+
+    S3 deletion failures are logged as warnings but do not abort the operation —
+    the DynamoDB record is always removed if it exists.
+
     Args:
         case_id: Unique case identifier
-        
+
     Raises:
         ValueError: If case not found
-        Exception: If deletion fails
+        Exception: If DynamoDB deletion fails
     """
     logger.info(f"Deleting case: {case_id}")
-    
+
     try:
-        # Verify case exists before deleting
         case = get_case(case_id)
-        
-        # Delete S3 files associated with the case
+
         s3_paths = case.get('s3_paths', {})
         deleted_files = []
-        
+
         for path_type, s3_path in s3_paths.items():
             if s3_path:
                 try:
-                    from utils import delete_s3_object
                     delete_s3_object(s3_path)
                     deleted_files.append(path_type)
                     logger.info(f"Deleted S3 file: {path_type} ({s3_path})")
                 except Exception as e:
                     logger.warning(f"Failed to delete S3 file {path_type}: {str(e)}")
-                    # Continue deleting other files even if one fails
-        
-        # Delete the case from DynamoDB
-        from utils import delete_dynamodb_item
+
         delete_dynamodb_item(case_id)
-        
-        logger.info(f"Successfully deleted case: {case_id} (deleted {len(deleted_files)} S3 files)")
-        
+
+        logger.info(
+            f"Successfully deleted case: {case_id} "
+            f"(deleted {len(deleted_files)} S3 files)"
+        )
+
     except ValueError:
         raise
     except Exception as e:
@@ -343,29 +362,33 @@ def should_trigger_bedrock_lambda(
     new_status: str
 ) -> tuple[bool, Optional[str]]:
     """
-    Determine if Bedrock Lambda should be triggered based on status transition
-    
+    Determine whether the Bedrock Lambda should be invoked based on the
+    status transition, and which action to pass if so.
+
+    Trigger rules:
+      → UNREDACTED_UPLOADED : action="process"
+          The unredacted document has just landed in S3.
+          Bedrock will extract text, run it against the active guideline,
+          and write a redaction-proposals JSON back to S3.
+
+      → APPLYING_REDACTIONS : action="apply"
+          The officer has finished reviewing proposals and submitted their
+          edited redactions JSON. Bedrock will apply the approved redactions
+          to the original PDF and write the redacted document to S3.
+
     Args:
-        current_status: Current case status
-        new_status: New case status
-        
+        current_status: The case's status before this update
+        new_status: The status being set now
+
     Returns:
-        Tuple of (should_trigger: bool, action: str or None)
+        (should_trigger, action) — action is None when should_trigger is False
     """
-    # Trigger with action="process" when unredacted doc is uploaded
     if new_status == STATUS_UNREDACTED_UPLOADED:
         return (True, "process")
-    
-    # Trigger with action="apply" when officer finishes reviewing/editing redactions
-    if new_status == STATUS_REVIEWING and current_status != STATUS_REVIEWING:
-        # This means officer just moved to reviewing state
-        # We'll trigger when they mark it complete (separate status update)
-        return (False, None)
-    
-    # Custom status for "ready to apply redactions" could be added
-    # For now, assume REVIEWING means they've finished editing
-    # In practice, you might want a STATUS_READY_TO_APPLY
-    
+
+    if new_status == STATUS_APPLYING_REDACTIONS:
+        return (True, "apply")
+
     return (False, None)
 
 
@@ -374,21 +397,35 @@ def build_s3_paths_for_bedrock(
     case: Dict[str, Any]
 ) -> Dict[str, str]:
     """
-    Build S3 paths dictionary for Bedrock Lambda invocation
-    
+    Build the S3 paths dictionary passed to the Bedrock Lambda.
+
+    Prefers paths already recorded on the case record; falls back to the
+    canonical constructed path if a field is not yet populated.
+
     Args:
         case_id: Unique case identifier
-        case: Case object from DynamoDB
-        
+        case: Full case object from DynamoDB
+
     Returns:
-        Dictionary of S3 paths
+        Dictionary of S3 paths keyed by file type
     """
     s3_paths_from_case = case.get('s3_paths', {})
-    
-    # Build complete S3 paths (construct if not in DB yet)
+
     return {
-        'unredacted_doc': s3_paths_from_case.get('unredacted_doc') or build_s3_path(case_id, 'unredacted'),
-        'redaction_proposals': s3_paths_from_case.get('redaction_proposals') or build_s3_path(case_id, 'redaction_proposals'),
-        'edited_redactions': s3_paths_from_case.get('edited_redactions') or build_s3_path(case_id, 'edited_redactions'),
-        'redacted_doc': s3_paths_from_case.get('redacted_doc') or build_s3_path(case_id, 'redacted_doc')
+        'unredacted_doc': (
+            s3_paths_from_case.get('unredacted_doc')
+            or build_s3_path(case_id, 'unredacted_doc')
+        ),
+        'redaction_proposals': (
+            s3_paths_from_case.get('redaction_proposals')
+            or build_s3_path(case_id, 'redaction_proposals')
+        ),
+        'edited_redactions': (
+            s3_paths_from_case.get('edited_redactions')
+            or build_s3_path(case_id, 'edited_redactions')
+        ),
+        'redacted_doc': (
+            s3_paths_from_case.get('redacted_doc')
+            or build_s3_path(case_id, 'redacted_doc')
+        ),
     }
