@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, User, FileText, Clock, CheckCircle, AlertTriangle, PlusCircle, Edit2, Trash2, Shield, Upload, ExternalLink, Download, Eye, Filter, ArrowUpDown, Loader2, ChevronDown, Check } from 'lucide-react';
+import { Search, User, FileText, Clock, CheckCircle, AlertTriangle, PlusCircle, Edit2, Trash2, Shield, Upload, ExternalLink, Download, Eye, Filter, ArrowUpDown, Loader2, ChevronDown, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getCasesByOfficer,
@@ -86,6 +86,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
   const sortDropdownRef = useRef<HTMLDivElement>(null);
   const redactedByDropdownRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'my' | 'other'>('my');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -118,6 +119,19 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
     fetchMyCases();
     fetchOtherCases();
   }, [fetchMyCases, fetchOtherCases]);
+
+  // Auto-refresh every 60s when any case is still processing
+  useEffect(() => {
+    const hasProcessing = [...myCases, ...otherCases].some(c => c.isProcessing);
+    if (!hasProcessing) return;
+
+    const interval = setInterval(() => {
+      fetchMyCases();
+      fetchOtherCases();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [myCases, otherCases, fetchMyCases, fetchOtherCases]);
 
   // Derive the combined list for metric cards (all cases this user can see)
   const allCases = [...myCases, ...otherCases];
@@ -253,6 +267,12 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
       setOtherCases(prev => prev.filter(c => c.id !== caseId));
       toast.success(`Case ${displayId} deleted`);
     }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([fetchMyCases(), fetchOtherCases()]);
+    setIsRefreshing(false);
   };
 
   const handleViewIntakeForm = async (caseData: CaseData) => {
@@ -517,6 +537,15 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
 
                   {/* Filter and Sort Buttons - Right Aligned */}
                   <div className="flex items-center gap-4">
+                    {/* Refresh Button */}
+                    <button
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      title="Refresh cases"
+                      className="p-3 bg-white border-2 border-slate-300 rounded-lg text-slate-600 hover:border-slate-400 hover:text-slate-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
+                    </button>
                     {/* Filter Dropdown */}
                     <div className="relative" style={{ width: '200px' }} ref={filterDropdownRef}>
                       <button

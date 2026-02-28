@@ -11,6 +11,7 @@ import { GuidelineSavedConfirmation } from './components/guideline-saved-confirm
 import { User, LogOut, ChevronDown } from 'lucide-react';
 import { Toaster } from "sonner";
 import { setOfficerIdentity, getCaseById, mapBackendStatus } from './components/apigatewaymanager';
+import { setAdminIdentity } from './components/adminapimanager';
 
 type FlowStep = 'sign-in' | 'dashboard' | 'intake-form' | 'case-detail' | 'admin-dashboard' | 'upload-guideline' | 'review-rules' | 'guideline-saved';
 
@@ -25,15 +26,13 @@ function AppInner() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [selectedCaseData, setSelectedCaseData] = useState<any | null>(null);
   const [isNewCase, setIsNewCase] = useState(false);
+  const [newCaseId, setNewCaseId] = useState<string | null>(null);
   const [intakeFormData, setIntakeFormData] = useState<IntakeFormData | null>(null);
-  const [uploadedGuidelineFile, setUploadedGuidelineFile] = useState<File | null>(null);
-  const [uploadedGuidelineFileUrl, setUploadedGuidelineFileUrl] = useState<string | null>(null);
-  const [savedGuidelineData, setSavedGuidelineData] = useState<{
+  const [guidelineUploadState, setGuidelineUploadState] = useState<{
+    guidelineId: string;
+    rules: any[];
     fileName: string;
-    fileSize: string;
-    uploadDate: string;
   } | null>(null);
-  const [shouldActivateGuideline, setShouldActivateGuideline] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   // Populate API identity whenever Cognito auth resolves
@@ -43,8 +42,15 @@ function AppInner() {
         officer_id: currentUser.sub,
         officer_name: currentUser.name,
       });
+
+      if (userRole === 'admin') {
+        setAdminIdentity({
+          officer_id: currentUser.sub,
+          officer_name: currentUser.name,
+        });
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, userRole]);
 
   // Track active processing timers to avoid creating duplicate timers
   const activeTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -289,12 +295,13 @@ function AppInner() {
   const handleStartNewCase = () => {
     setIsNewCase(true);
     setSelectedCaseId(null);
+    setNewCaseId(null);
     setIntakeFormData(null);
     setCurrentStep('intake-form');
   };
 
-  const handleIntakeFormSubmit = (formData: IntakeFormData) => {
-    setIntakeFormData(formData);
+  const handleIntakeFormSubmit = (caseId: string) => {
+    setNewCaseId(caseId);
     setCurrentStep('case-detail');
   };
 
@@ -419,12 +426,12 @@ function AppInner() {
         if (isNewCase) {
           const newCaseNumber = 45820 + cases.length + 1;
           const tempCase = {
-            id: `temp-${Date.now()}`,
-            caseId: intakeFormData?.caseNumber || `TPD-${newCaseNumber}`,
-            requesterName: intakeFormData?.requesterName || 'New Requester',
+            id: newCaseId ?? `temp-${Date.now()}`,
+            caseId: newCaseId ?? `TPD-${newCaseNumber}`,
+            requesterName: 'New Requester',
             redactionStatus: 'Not Started' as const,
             dateCreated: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            intakeFormData: intakeFormData
+            intakeFormData: null,
           };
           return (
             <CaseDetailScreen
@@ -460,103 +467,45 @@ function AppInner() {
       case 'admin-dashboard':
         return (
           <AdminDashboard
-            cases={cases}
-            onUpdateCases={setCases}
             onUploadGuideline={() => setCurrentStep('upload-guideline')}
-            newGuideline={savedGuidelineData}
-            shouldActivateNewGuideline={shouldActivateGuideline}
           />
         );
       case 'upload-guideline':
         return (
           <UploadGuidelineScreen
             onBack={() => setCurrentStep('admin-dashboard')}
-            onScanDocument={(file) => {
-              setUploadedGuidelineFile(file);
-              setUploadedGuidelineFileUrl(URL.createObjectURL(file));
+            onProcessingComplete={(guidelineId, rules, fileName) => {
+              setGuidelineUploadState({ guidelineId, rules, fileName });
               setCurrentStep('review-rules');
             }}
           />
         );
       case 'review-rules':
-        const mockExtractedRules = [
-          {
-            id: '1',
-            title: 'PII Rule #1',
-            category: 'PII',
-            ruleText: 'TPD Redaction Rule 1.1: All names of private citizens, witnesses, and victims must be redacted unless specifically authorized for public release.'
-          },
-          {
-            id: '2',
-            title: 'PII Rule #2',
-            category: 'PII',
-            ruleText: 'TPD Redaction Rule 1.2: Social security numbers, driver\'s license numbers, and other government-issued identification numbers must be completely redacted.'
-          },
-          {
-            id: '3',
-            title: 'Contact Rule #1',
-            category: 'Addresses',
-            ruleText: 'TPD Redaction Rule 2.1: Phone numbers, email addresses, and physical addresses of private citizens must be redacted unless part of public record.'
-          },
-          {
-            id: '4',
-            title: 'Address Rule #1',
-            category: 'Addresses',
-            ruleText: 'TPD Redaction Rule 4.1: Residential addresses of suspects, victims, and witnesses must be redacted unless part of public record.'
-          },
-          {
-            id: '5',
-            title: 'Address Rule #2',
-            category: 'Addresses',
-            ruleText: 'TPD Redaction Rule 4.2: Safe house locations and protected witness addresses must always be redacted.'
-          },
-          {
-            id: '6',
-            title: 'Name Rule #1',
-            category: 'Names',
-            ruleText: 'TPD Redaction Rule 1.3: Names of minors involved in any capacity must be redacted in all documents.'
-          },
-          {
-            id: '7',
-            title: 'Sensitive Info Rule #1',
-            category: 'Sensitive Info',
-            ruleText: 'TPD Redaction Rule 3.1: Medical information, financial records, and details of ongoing investigations must be protected.'
-          },
-          {
-            id: '8',
-            title: 'Sensitive Info Rule #2',
-            category: 'Sensitive Info',
-            ruleText: 'TPD Redaction Rule 3.2: Confidential informant information and undercover officer identities must be completely redacted.'
-          }
-        ];
-
+        if (!guidelineUploadState) {
+          setCurrentStep('upload-guideline');
+          return null;
+        }
         return (
           <ReviewExtractedRules
-            fileName={uploadedGuidelineFile?.name || 'guideline-document.pdf'}
-            extractedRules={mockExtractedRules}
-            fileUrl={uploadedGuidelineFileUrl}
-            onSaveGuideline={() => {
+            fileName={guidelineUploadState.fileName}
+            extractedRules={guidelineUploadState.rules}
+            fileUrl={null}
+            onSaveGuideline={(guidelineId: string) => {
               setCurrentStep('guideline-saved');
-              setUploadedGuidelineFile(null);
-              setUploadedGuidelineFileUrl(null);
-              setSavedGuidelineData({
-                fileName: uploadedGuidelineFile?.name || 'guideline-document.pdf',
-                fileSize: uploadedGuidelineFile ? `${uploadedGuidelineFile.size} bytes` : '0 bytes',
-                uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              });
             }}
             onBackToUpload={() => setCurrentStep('upload-guideline')}
           />
         );
       case 'guideline-saved':
+        if (!guidelineUploadState) {
+          setCurrentStep('admin-dashboard');
+          return null;
+        }
         return (
           <GuidelineSavedConfirmation
-            onSetAsActive={() => {
-              setShouldActivateGuideline(true);
-              setCurrentStep('admin-dashboard');
-            }}
+            guidelineId={guidelineUploadState.guidelineId}
             onGoToDashboard={() => {
-              setShouldActivateGuideline(false);
+              setGuidelineUploadState(null);
               setCurrentStep('admin-dashboard');
             }}
           />

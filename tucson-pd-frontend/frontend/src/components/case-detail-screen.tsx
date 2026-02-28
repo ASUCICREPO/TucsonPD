@@ -66,6 +66,14 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  function clearFile() {
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    setUploadStatus('ready');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
   // Form fields
   const [caseNumber, setCaseNumber] = useState('');
   const [requesterName, setRequesterName] = useState('');
@@ -505,7 +513,7 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
                       </div>
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={clearFile}
                         className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors flex-shrink-0 ml-4"
                       >
                         Replace File

@@ -1,200 +1,276 @@
-import { useState, useEffect } from 'react';
-import { Search, FileText, Upload, Eye, CheckCircle, Circle, Trash2, Shield, ArrowUpDown, Plus, X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, FileText, ArrowUpDown, Plus, X, CheckCircle, Trash2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import {
+  getAllGuidelines,
+  activateGuideline,
+  deleteGuideline,
+  type ApiGuideline,
+  type GuidelineDisplayStatus,
+  mapGuidelineProcessingStatus,
+} from './adminapimanager';
 
-interface GuidelineDocument {
-  id: string;
-  name: string;
-  fileName: string;
-  uploadDate: string;
-  uploadedBy: string;
-  isActive: boolean;
-  fileSize: string;
-  version: string;
-}
+// =============================================================================
+// TYPES
+// =============================================================================
+
+type SortKey = 'uploadDate-desc' | 'uploadDate-asc' | 'name-asc' | 'name-desc';
 
 interface AdminDashboardProps {
-  cases: any[];
-  onUpdateCases: (cases: any[]) => void;
   onUploadGuideline: () => void;
-  newGuideline?: {
-    fileName: string;
-    fileSize: string;
-    uploadDate: string;
-  } | null;
-  shouldActivateNewGuideline?: boolean;
 }
 
-export function AdminDashboard({ cases, onUpdateCases, onUploadGuideline, newGuideline, shouldActivateNewGuideline }: AdminDashboardProps) {
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function formatDate(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatFileSize(s3Path: string): string {
+  // File size isn't stored on the DynamoDB record — show the version instead
+  // as a useful identifier. Size would require a separate S3 HeadObject call.
+  return s3Path ? 'PDF' : '—';
+}
+
+// =============================================================================
+// PROCESSING STATUS BADGE
+// =============================================================================
+
+function ProcessingBadge({ status }: { status: GuidelineDisplayStatus }) {
+  const styles: Record<GuidelineDisplayStatus, string> = {
+    Pending:    'bg-slate-100 text-slate-600 border-slate-200',
+    Processing: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    Ready:      'bg-blue-100 text-blue-700 border-blue-200',
+    Failed:     'bg-red-100 text-red-700 border-red-200',
+  };
+
+  const icons: Record<GuidelineDisplayStatus, JSX.Element> = {
+    Pending:    <Loader2 className="w-3 h-3" />,
+    Processing: <Loader2 className="w-3 h-3 animate-spin" />,
+    Ready:      <CheckCircle className="w-3 h-3" />,
+    Failed:     <AlertCircle className="w-3 h-3" />,
+  };
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-sm ${styles[status]}`}>
+      {icons[status]}
+      {status}
+    </span>
+  );
+}
+
+// =============================================================================
+// COMPONENT
+// =============================================================================
+
+export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
+  const [guidelines, setGuidelines] = useState<ApiGuideline[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<string>('uploadDate-desc');
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [guidelineName, setGuidelineName] = useState('');
-  const [selectedGuideline, setSelectedGuideline] = useState<GuidelineDocument | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>('uploadDate-desc');
+  const [selectedGuideline, setSelectedGuideline] = useState<ApiGuideline | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Demo guideline documents data
-  const [guidelines, setGuidelines] = useState<GuidelineDocument[]>([
-    {
-      id: '1',
-      name: 'Standard Redaction Guidelines 2025',
-      fileName: 'TPD_Redaction_Guidelines_2025.pdf',
-      uploadDate: 'Dec 1, 2025',
-      uploadedBy: 'Admin',
-      isActive: true,
-      fileSize: '2.4 MB',
-      version: 'v2.1'
-    },
-    {
-      id: '2',
-      name: 'PII Protection Standards',
-      fileName: 'PII_Protection_Standards.pdf',
-      uploadDate: 'Nov 15, 2025',
-      uploadedBy: 'Admin',
-      isActive: false,
-      fileSize: '1.8 MB',
-      version: 'v1.5'
-    },
-    {
-      id: '3',
-      name: 'Body Camera Footage Redaction Rules',
-      fileName: 'Body_Camera_Redaction_Rules.pdf',
-      uploadDate: 'Oct 28, 2025',
-      uploadedBy: 'Admin',
-      isActive: false,
-      fileSize: '3.1 MB',
-      version: 'v1.0'
-    },
-    {
-      id: '4',
-      name: 'Juvenile Records Guidelines',
-      fileName: 'Juvenile_Records_Guidelines.pdf',
-      uploadDate: 'Oct 10, 2025',
-      uploadedBy: 'Admin',
-      isActive: false,
-      fileSize: '1.2 MB',
-      version: 'v1.3'
-    }
-  ]);
+  // ---------------------------------------------------------------------------
+  // LOAD
+  // ---------------------------------------------------------------------------
 
-  const handleViewGuideline = (guideline: GuidelineDocument) => {
-    // Simulate viewing the guideline document
-    alert(`Opening guideline: ${guideline.name}`);
-  };
+  const loadGuidelines = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
 
-  const handleActivateGuideline = (guidelineId: string) => {
-    setGuidelines(guidelines.map(g => ({
-      ...g,
-      isActive: g.id === guidelineId
-    })));
-  };
+    const { data, error } = await getAllGuidelines();
 
-  const handleDeleteGuideline = (guidelineId: string, guidelineName: string) => {
-    if (confirm(`Are you sure you want to delete "${guidelineName}"?`)) {
-      setGuidelines(guidelines.filter(g => g.id !== guidelineId));
-    }
-  };
-
-  const handleUploadGuideline = () => {
-    if (!uploadFile || !guidelineName.trim()) {
-      alert('Please provide a guideline name and select a file');
+    if (error || !data) {
+      setLoadError(error ?? 'Failed to load guidelines');
+      setIsLoading(false);
       return;
     }
 
-    const newGuideline: GuidelineDocument = {
-      id: `${Date.now()}`,
-      name: guidelineName,
-      fileName: uploadFile.name,
-      uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      uploadedBy: 'Admin',
-      isActive: false,
-      fileSize: `${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB`,
-      version: 'v1.0'
-    };
+    setGuidelines(data.guidelines);
+    setIsLoading(false);
+  }, []);
 
-    setGuidelines([newGuideline, ...guidelines]);
-    setShowUploadModal(false);
-    setUploadFile(null);
-    setGuidelineName('');
+  useEffect(() => {
+    loadGuidelines();
+  }, [loadGuidelines]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadGuidelines();
+    setIsRefreshing(false);
   };
 
-  // Handle new guideline from parent
-  useEffect(() => {
-    if (newGuideline && shouldActivateNewGuideline) {
-      const guideline: GuidelineDocument = {
-        id: `new-${Date.now()}`,
-        name: newGuideline.fileName.replace(/\.[^/.]+$/, ''), // Remove file extension for name
-        fileName: newGuideline.fileName,
-        uploadDate: newGuideline.uploadDate,
-        uploadedBy: 'Admin',
-        isActive: true,
-        fileSize: newGuideline.fileSize,
-        version: 'v1.0'
-      };
-      
-      // Set all existing guidelines to inactive and add new one as active
-      setGuidelines(prevGuidelines => [
-        guideline,
-        ...prevGuidelines.map(g => ({ ...g, isActive: false }))
-      ]);
+  // ---------------------------------------------------------------------------
+  // ACTIONS
+  // ---------------------------------------------------------------------------
+
+  const handleActivate = async (guideline: ApiGuideline) => {
+    if (guideline.status === 'active') return;
+
+    // Must be processing_status === 'completed' to activate
+    if (guideline.processing_status !== 'completed') {
+      setActionError(`"${guideline.description}" cannot be activated — it hasn't finished processing yet.`);
+      return;
     }
-  }, [newGuideline, shouldActivateNewGuideline]);
 
-  // Filter guidelines
-  let filteredGuidelines = guidelines.filter(g => {
-    const matchesSearch = g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.fileName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+    setActivatingId(guideline.guideline_id);
+    setActionError(null);
 
-  // Sort guidelines
-  const sortedGuidelines = [...filteredGuidelines].sort((a, b) => {
-    const [field, direction] = sortBy.split('-');
-    let aVal, bVal;
-    
-    if (field === 'name') {
-      aVal = a.name;
-      bVal = b.name;
-    } else if (field === 'uploadDate') {
-      // Convert date strings to Date objects for proper comparison
-      aVal = new Date(a.uploadDate).getTime();
-      bVal = new Date(b.uploadDate).getTime();
+    const { error } = await activateGuideline(guideline.guideline_id);
+
+    if (error) {
+      setActionError(`Failed to activate guideline: ${error}`);
     } else {
-      return 0;
+      // Optimistically update local state so UI responds immediately
+      setGuidelines(prev =>
+        prev.map(g => ({ ...g, status: g.guideline_id === guideline.guideline_id ? 'active' : 'inactive' }))
+      );
     }
-    
-    const modifier = direction === 'asc' ? 1 : -1;
-    return aVal < bVal ? -modifier : modifier;
+
+    setActivatingId(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDeleteId) return;
+
+    setDeletingId(confirmDeleteId);
+    setConfirmDeleteId(null);
+    setActionError(null);
+
+    const { error } = await deleteGuideline(confirmDeleteId);
+
+    if (error) {
+      setActionError(`Failed to delete guideline: ${error}`);
+    } else {
+      setGuidelines(prev => prev.filter(g => g.guideline_id !== confirmDeleteId));
+    }
+
+    setDeletingId(null);
+  };
+
+  // ---------------------------------------------------------------------------
+  // FILTER & SORT
+  // ---------------------------------------------------------------------------
+
+  const filtered = guidelines.filter(g => {
+    const q = searchQuery.toLowerCase();
+    return (
+      g.description.toLowerCase().includes(q) ||
+      g.version.toLowerCase().includes(q) ||
+      g.uploaded_by_name.toLowerCase().includes(q)
+    );
   });
 
-  // Calculate metrics
-  const totalGuidelines = guidelines.length;
-  const activeGuideline = guidelines.find(g => g.isActive);
-  const inactiveGuidelines = guidelines.filter(g => !g.isActive).length;
+  const sorted = [...filtered].sort((a, b) => {
+    const [field, dir] = sortBy.split('-');
+    const mod = dir === 'asc' ? 1 : -1;
+
+    if (field === 'name') {
+      return a.description.localeCompare(b.description) * mod;
+    }
+    // uploadDate
+    return (a.created_at - b.created_at) * mod;
+  });
+
+  // ---------------------------------------------------------------------------
+  // DERIVED METRICS
+  // ---------------------------------------------------------------------------
+
+  const activeGuideline = guidelines.find(g => g.status === 'active');
+
+  // ---------------------------------------------------------------------------
+  // RENDER STATES
+  // ---------------------------------------------------------------------------
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-slate-500">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <p>Loading guidelines...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-md border border-red-200 p-8 max-w-md text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <p className="text-slate-900 mb-2">Failed to load guidelines</p>
+          <p className="text-slate-500 mb-6">{loadError}</p>
+          <button
+            onClick={loadGuidelines}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // MAIN RENDER
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Main Content */}
       <main className="flex-1 px-8 py-8">
         <div className="max-w-7xl mx-auto">
-          {/* Page Title and Actions */}
+
+          {/* Page Title */}
           <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-slate-900 mb-1">Admin Dashboard</h2>
+            <h2 className="text-slate-900 mb-1">Admin Dashboard</h2>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh guidelines"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing…' : 'Refresh'}
+              </button>
+              <button
+                onClick={onUploadGuideline}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Upload New Guideline
+              </button>
             </div>
-            <button
-              onClick={onUploadGuideline}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Upload New Guideline
-            </button>
           </div>
 
-          {/* Metrics Summary */}
+          {/* Action Error Banner */}
+          {actionError && (
+            <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-red-700 flex-1">{actionError}</p>
+              <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Metric Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Active Guideline Info Card */}
-            <div className="bg-white rounded-lg shadow-md border border-slate-200 pt-6 px-6">
-              <div className="flex items-start justify-between mb-6">
+
+            {/* Active Guideline */}
+            <div className="bg-white rounded-lg shadow-md border border-slate-200 pt-6 px-6 pb-6">
+              <div className="flex items-start justify-between mb-4">
                 <h3 className="text-slate-600">Active Guideline</h3>
                 <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
                   <CheckCircle className="w-6 h-6 text-emerald-600" />
@@ -202,16 +278,19 @@ export function AdminDashboard({ cases, onUpdateCases, onUploadGuideline, newGui
               </div>
               {activeGuideline ? (
                 <div>
-                  <div className="text-slate-900 mb-2">{activeGuideline.name}</div>
+                  <p className="text-slate-900 font-medium">{activeGuideline.description}</p>
+                  <p className="text-slate-500 text-sm mt-1">
+                    {activeGuideline.version} · Uploaded {formatDate(activeGuideline.created_at)}
+                  </p>
                 </div>
               ) : (
-                <div className="text-slate-500">No active guideline</div>
+                <p className="text-slate-500">No active guideline set</p>
               )}
             </div>
 
-            {/* Total Guidelines Card */}
+            {/* Total Guidelines */}
             <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6">
-              <div className="flex items-start justify-between mb-6">
+              <div className="flex items-start justify-between mb-4">
                 <h3 className="text-slate-600">Total Guidelines</h3>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                   <FileText className="w-6 h-6 text-blue-600" />
@@ -221,322 +300,264 @@ export function AdminDashboard({ cases, onUpdateCases, onUploadGuideline, newGui
             </div>
           </div>
 
-          {/* Search Bar with Filter and Sort */}
+          {/* Search + Sort */}
           <div className="mb-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Search Bar */}
               <div className="lg:col-span-9 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by guideline name or filename..."
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search by name, version, or uploaded by..."
                   className="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition-colors"
                 />
               </div>
-
-              {/* Sort Dropdown */}
               <div className="lg:col-span-3 relative">
                 <ArrowUpDown className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                  onChange={e => setSortBy(e.target.value as SortKey)}
                   className="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 transition-colors appearance-none cursor-pointer"
                 >
                   <option value="uploadDate-desc">Newest First</option>
                   <option value="uploadDate-asc">Oldest First</option>
-                  <option value="name-asc">Name (A-Z)</option>
-                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="name-asc">Name (A–Z)</option>
+                  <option value="name-desc">Name (Z–A)</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Guidelines List Table */}
+          {/* Guidelines Table */}
           <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-slate-900">Guideline Name</th>
+                    <th className="px-6 py-4 text-left text-slate-900">Version</th>
                     <th className="px-6 py-4 text-left text-slate-900">Upload Date</th>
+                    <th className="px-6 py-4 text-left text-slate-900">Status</th>
                     <th className="px-6 py-4 text-center text-slate-900">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {sortedGuidelines.map((guideline) => (
-                    <tr key={guideline.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => setSelectedGuideline(guideline)}
-                            className="text-slate-900 hover:text-blue-600 hover:underline transition-colors text-left"
-                          >
-                            {guideline.name}
-                          </button>
-                          {guideline.isActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm">
-                              <CheckCircle className="w-3 h-3" />
-                              Active
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-slate-600">{guideline.uploadDate}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleActivateGuideline(guideline.id)}
-                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                            title="Set as active"
-                            disabled={guideline.isActive}
-                          >
-                            <CheckCircle className={`w-4 h-4 ${guideline.isActive ? 'opacity-30' : ''}`} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGuideline(guideline.id, guideline.name)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete guideline"
-                            disabled={guideline.isActive}
-                          >
-                            <Trash2 className={`w-4 h-4 ${guideline.isActive ? 'opacity-30' : ''}`} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {sorted.map(guideline => {
+                    const displayStatus = mapGuidelineProcessingStatus(guideline.processing_status);
+                    const isActivating = activatingId === guideline.guideline_id;
+                    const isDeleting = deletingId === guideline.guideline_id;
+                    const canActivate = guideline.processing_status === 'completed' && guideline.status !== 'active';
+                    const canDelete = guideline.status !== 'active';
+
+                    return (
+                      <tr key={guideline.guideline_id} className="hover:bg-slate-50 transition-colors">
+
+                        {/* Name */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => setSelectedGuideline(guideline)}
+                              className="text-slate-900 hover:text-blue-600 hover:underline transition-colors text-left"
+                            >
+                              {guideline.description}
+                            </button>
+                            {guideline.status === 'active' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm">
+                                <CheckCircle className="w-3 h-3" />
+                                Active
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Version */}
+                        <td className="px-6 py-4">
+                          <span className="text-slate-500 font-mono text-sm">{guideline.version}</span>
+                        </td>
+
+                        {/* Upload Date */}
+                        <td className="px-6 py-4">
+                          <span className="text-slate-600">{formatDate(guideline.created_at)}</span>
+                        </td>
+
+                        {/* Processing Status */}
+                        <td className="px-6 py-4">
+                          <ProcessingBadge status={displayStatus} />
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+
+                            {/* Activate */}
+                            <button
+                              onClick={() => handleActivate(guideline)}
+                              disabled={!canActivate || isActivating}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={
+                                guideline.status === 'active'
+                                  ? 'Already active'
+                                  : guideline.processing_status !== 'completed'
+                                  ? 'Must finish processing before activating'
+                                  : 'Set as active'
+                              }
+                            >
+                              {isActivating
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <CheckCircle className="w-4 h-4" />
+                              }
+                            </button>
+
+                            {/* Delete */}
+                            <button
+                              onClick={() => setConfirmDeleteId(guideline.guideline_id)}
+                              disabled={!canDelete || isDeleting}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={guideline.status === 'active' ? 'Cannot delete active guideline' : 'Delete'}
+                            >
+                              {isDeleting
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <Trash2 className="w-4 h-4" />
+                              }
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Empty State */}
-            {sortedGuidelines.length === 0 && (
+            {sorted.length === 0 && (
               <div className="py-12 text-center">
                 <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-600 mb-2">No guidelines found</p>
-                <p className="text-slate-500">Try adjusting your search criteria</p>
+                {searchQuery
+                  ? <><p className="text-slate-600 mb-2">No guidelines match your search</p><p className="text-slate-500">Try adjusting your search criteria</p></>
+                  : <><p className="text-slate-600 mb-2">No guidelines uploaded yet</p><p className="text-slate-500">Click "Upload New Guideline" to get started</p></>
+                }
               </div>
             )}
           </div>
         </div>
       </main>
 
-      {/* View Guideline Modal */}
+      {/* Footer */}
+      <footer className="bg-slate-900 text-slate-400 py-4 px-8 text-center mt-8">
+        <p>TPD Records Processing System v1.0 | Secure Document Processing</p>
+      </footer>
+
+      {/* ── GUIDELINE DETAIL MODAL ── */}
       {selectedGuideline && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full h-[85vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full flex flex-col">
+
+            {/* Header */}
+            <div className="flex items-start justify-between p-6 border-b border-slate-200">
               <div>
-                <h2 className="text-slate-900 mb-1">{selectedGuideline.name}</h2>
-                <div className="flex items-center gap-4 text-slate-600">
-                  <span>{selectedGuideline.fileName}</span>
-                  <span>•</span>
-                  <span>{selectedGuideline.fileSize}</span>
-                  <span>•</span>
-                  <span>Uploaded: {selectedGuideline.uploadDate}</span>
+                <h2 className="text-slate-900 mb-1">{selectedGuideline.description}</h2>
+                <div className="flex flex-wrap items-center gap-3 text-slate-500 text-sm">
+                  <span>Version: {selectedGuideline.version}</span>
+                  <span>·</span>
+                  <span>Uploaded: {formatDate(selectedGuideline.created_at)}</span>
+                  <span>·</span>
+                  <span>By: {selectedGuideline.uploaded_by_name}</span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedGuideline(null)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors ml-4 flex-shrink-0"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Document Viewer */}
-            <div className="flex-1 overflow-auto p-6 bg-slate-50">
-              <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8">
-                {/* Simulated PDF Content */}
-                <div className="space-y-6">
-                  <div className="text-center border-b border-slate-200 pb-4">
-                    <h1 className="text-slate-900 text-3xl mb-2">{selectedGuideline.name}</h1>
-                    <p className="text-slate-600">Tampa Police Department</p>
-                    <p className="text-slate-600">Records Management Division</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-slate-900 mb-2">1. Purpose and Scope</h3>
-                      <p className="text-slate-700 leading-relaxed">
-                        This guideline establishes standardized procedures for redacting sensitive information from public records requests. 
-                        All personnel handling records must adhere to these guidelines to ensure compliance with state and federal privacy laws.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-slate-900 mb-2">2. Protected Information Categories</h3>
-                      <p className="text-slate-700 leading-relaxed mb-2">
-                        The following categories of information must be redacted from public records:
-                      </p>
-                      <ul className="list-disc list-inside space-y-2 text-slate-700 ml-4">
-                        <li>Personal Identifiable Information (PII): Social Security numbers, driver's license numbers, bank account information</li>
-                        <li>Medical Records: Health conditions, treatment information, prescription details</li>
-                        <li>Juvenile Information: Names, addresses, and identifying information of minors</li>
-                        <li>Ongoing Investigation Details: Confidential sources, investigative techniques, surveillance locations</li>
-                        <li>Security Information: Building layouts, security protocols, access codes</li>
-                      </ul>
-                    </div>
-
-                    <div>
-                      <h3 className="text-slate-900 mb-2">3. Redaction Standards</h3>
-                      <p className="text-slate-700 leading-relaxed mb-2">
-                        All redactions must be permanent and irreversible. Use the following methods:
-                      </p>
-                      <ul className="list-disc list-inside space-y-2 text-slate-700 ml-4">
-                        <li>Digital redaction using approved software tools</li>
-                        <li>Complete removal of metadata from electronic documents</li>
-                        <li>Black boxes covering sensitive areas in scanned documents</li>
-                        <li>Audio muting or beeping for video/audio recordings</li>
-                      </ul>
-                    </div>
-
-                    <div>
-                      <h3 className="text-slate-900 mb-2">4. Review Process</h3>
-                      <p className="text-slate-700 leading-relaxed">
-                        All redacted documents must be reviewed by a supervisory officer before release. The reviewing officer must 
-                        verify that all sensitive information has been properly redacted and that the remaining content is appropriate 
-                        for public disclosure under applicable laws and regulations.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-slate-900 mb-2">5. Documentation and Retention</h3>
-                      <p className="text-slate-700 leading-relaxed">
-                        Maintain detailed logs of all redaction activities, including the date, officer responsible, document ID, 
-                        and categories of information redacted. Original unredacted documents must be retained in secure storage 
-                        according to department retention schedules.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-slate-900 mb-2">6. Training Requirements</h3>
-                      <p className="text-slate-700 leading-relaxed">
-                        All personnel involved in records processing must complete annual training on redaction procedures, 
-                        privacy laws, and the use of redaction software. Training records must be maintained in the personnel file.
-                      </p>
-                    </div>
-
-                    <div className="mt-8 pt-4 border-t border-slate-200 text-slate-600 text-center">
-                      <p>Document Version: {selectedGuideline.version}</p>
-                      <p>Effective Date: {selectedGuideline.uploadDate}</p>
-                      <p>Uploaded By: {selectedGuideline.uploadedBy}</p>
-                    </div>
-                  </div>
-                </div>
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Processing Status</span>
+                <ProcessingBadge status={mapGuidelineProcessingStatus(selectedGuideline.processing_status)} />
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-slate-900">Upload New Guideline</h2>
-              <button
-                onClick={() => {
-                  setShowUploadModal(false);
-                  setUploadFile(null);
-                  setGuidelineName('');
-                }}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Guideline Name Input */}
-            <div className="mb-6">
-              <label className="block text-slate-900 mb-2">Guideline Name</label>
-              <input
-                type="text"
-                value={guidelineName}
-                onChange={(e) => setGuidelineName(e.target.value)}
-                placeholder="e.g., Standard Redaction Guidelines 2026"
-                className="w-full px-4 py-3 bg-white border-2 border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition-colors"
-              />
-            </div>
-
-            {/* File Upload Area */}
-            <div className="mb-6">
-              <label className="block text-slate-900 mb-2">Select Document</label>
-              <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-600 transition-colors">
-                {uploadFile ? (
-                  <div className="space-y-4">
-                    <FileText className="w-12 h-12 text-blue-600 mx-auto" />
-                    <div>
-                      <p className="text-slate-900">{uploadFile.name}</p>
-                      <p className="text-slate-500">{(uploadFile.size / (1024 * 1024)).toFixed(2)} MB</p>
-                    </div>
-                    <button
-                      onClick={() => setUploadFile(null)}
-                      className="text-blue-600 hover:text-blue-700 transition-colors"
-                    >
-                      Choose different file
-                    </button>
-                  </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Activation Status</span>
+                {selectedGuideline.status === 'active' ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm">
+                    <CheckCircle className="w-3 h-3" />
+                    Active
+                  </span>
                 ) : (
-                  <div className="space-y-4">
-                    <Upload className="w-12 h-12 text-slate-400 mx-auto" />
-                    <div>
-                      <label className="cursor-pointer text-blue-600 hover:text-blue-700 transition-colors">
-                        Browse files
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              setUploadFile(e.target.files[0]);
-                            }
-                          }}
-                          className="hidden"
-                        />
-                      </label>
-                      <p className="text-slate-500 mt-1">or drag and drop</p>
-                    </div>
-                    <p className="text-slate-500">PDF, DOC, DOCX up to 10MB</p>
-                  </div>
+                  <span className="text-slate-500 text-sm">Inactive</span>
                 )}
               </div>
+              {selectedGuideline.activated_at && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Activated</span>
+                  <span className="text-slate-500 text-sm">{formatDate(selectedGuideline.activated_at)}</span>
+                </div>
+              )}
+              {selectedGuideline.error_info?.last_error && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                  <p className="text-red-700 text-sm font-medium mb-1">Last Error</p>
+                  <p className="text-red-600 text-sm">{selectedGuideline.error_info.last_error}</p>
+                </div>
+              )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-4">
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
+              {selectedGuideline.status !== 'active' && selectedGuideline.processing_status === 'completed' && (
+                <button
+                  onClick={async () => {
+                    setSelectedGuideline(null);
+                    await handleActivate(selectedGuideline);
+                  }}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+                >
+                  Set as Active
+                </button>
+              )}
               <button
-                onClick={() => {
-                  setShowUploadModal(false);
-                  setUploadFile(null);
-                  setGuidelineName('');
-                }}
-                className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
+                onClick={() => setSelectedGuideline(null)}
+                className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors text-sm"
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleUploadGuideline}
-                disabled={!uploadFile || !guidelineName.trim()}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
-              >
-                Upload Guideline
+                Close
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-4 px-8 text-center mt-8">
-        <p>TPD Records Processing System v1.0 | Secure Document Processing</p>
-      </footer>
+      {/* ── DELETE CONFIRMATION MODAL ── */}
+      {confirmDeleteId && (() => {
+        const target = guidelines.find(g => g.guideline_id === confirmDeleteId);
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-slate-900 mb-2">Delete Guideline?</h3>
+              <p className="text-slate-600 mb-6">
+                Are you sure you want to delete <span className="font-medium">"{target?.description}"</span>?
+                This cannot be undone. The original PDF will be retained in S3 for audit purposes.
+              </p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

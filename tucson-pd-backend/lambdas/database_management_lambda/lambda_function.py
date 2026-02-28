@@ -98,6 +98,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 except Exception:
                     pass
 
+        # is_admin must be checked independently of officer_id source —
+        # query params are read for officer_id but is_admin was never extracted
+        # from them. Check query params and body here unconditionally.
+        if not is_admin:
+            if query_parameters.get('is_admin', '').lower() in ('true', '1'):
+                is_admin = True
+            elif event.get('body'):
+                try:
+                    body_peek = parse_request_body(event)
+                    is_admin = bool(body_peek.get('is_admin', False))
+                except Exception:
+                    pass
+
         if not officer_id:
             logger.warning("Request received with no officer_id")
             return build_api_response(401, {
