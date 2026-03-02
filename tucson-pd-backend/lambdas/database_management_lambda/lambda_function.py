@@ -21,6 +21,7 @@ API Endpoints:
 - GET    /guidelines/all                     → List all guidelines with metadata (admin)
 - GET    /guidelines/active                  → Get active guidelines
 - GET    /guidelines/{guideline_id}/rules    → Get rules content for completed/reviewed guideline (admin)
+- GET    /guidelines/{guideline_id}/document → Get pre-signed URL for original PDF (admin)
 - PUT    /guidelines/{guideline_id}/activate → Set guideline as active (admin)
 - PUT    /guidelines/{guideline_id}          → Update guideline JSON after review (admin)
 - DELETE /guidelines/{guideline_id}          → Delete guideline (admin)
@@ -47,6 +48,7 @@ from guidelines_management import (
     list_all_guidelines,
     get_active_guideline,
     get_guideline_rules,
+    get_guideline_document_url,
     update_guideline_json,
     activate_guideline,
     delete_guideline,
@@ -204,6 +206,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return build_api_response(403, {"error": "Forbidden", "message": "Admin access required"}, error=True)
             guideline_id = path_parameters['guideline_id']
             return handle_get_guideline_rules(guideline_id)
+
+        # GET /guidelines/{guideline_id}/document - Get pre-signed URL for original PDF (admin only)
+        elif http_method == 'GET' and path.endswith('/document') and path_parameters.get('guideline_id'):
+            if not is_admin:
+                return build_api_response(403, {"error": "Forbidden", "message": "Admin access required"}, error=True)
+            guideline_id = path_parameters['guideline_id']
+            return handle_get_guideline_document_url(guideline_id)
 
         # PUT /guidelines/{guideline_id}/activate - Activate guideline (admin only)
         elif http_method == 'PUT' and path.endswith('/activate') and path_parameters.get('guideline_id'):
@@ -502,6 +511,21 @@ def handle_get_guideline_rules(guideline_id: str) -> Dict[str, Any]:
         "processing_status": guideline['processing_status'],
         "version": guideline.get('version', ''),
         "description": guideline.get('description', ''),
+    })
+
+
+def handle_get_guideline_document_url(guideline_id: str) -> Dict[str, Any]:
+    """Handle GET /guidelines/{guideline_id}/document - Get pre-signed URL for original PDF"""
+    logger.info(f"Generating PDF download URL for guideline: {guideline_id}")
+
+    result = get_guideline_document_url(guideline_id)
+
+    return build_api_response(200, {
+        "success": True,
+        "guideline_id": guideline_id,
+        "download_url": result['download_url'],
+        "pdf_s3_path": result['pdf_s3_path'],
+        "processing_status": result['processing_status'],
     })
 
 

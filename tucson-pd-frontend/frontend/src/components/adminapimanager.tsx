@@ -621,6 +621,45 @@ export async function fetchGuidelineRules(
 }
 
 
+/**
+ * Fetch a pre-signed GET URL for downloading the original PDF of a guideline.
+ * Available for any guideline regardless of processing status — the PDF is
+ * uploaded before processing begins, so the URL is always retrievable.
+ *
+ * → GET /guidelines/{guideline_id}/document
+ * ← { success, guideline_id, download_url, pdf_s3_path, processing_status }
+ *
+ * The returned download_url is a time-limited S3 presigned URL. Open it
+ * directly in a new tab or use it as an <iframe> src to display the PDF.
+ *
+ * @param guidelineId  The guideline_id to fetch the PDF URL for
+ */
+export async function fetchGuidelineDocumentUrl(
+  guidelineId: string
+): Promise<ApiResponse<{ download_url: string; pdf_s3_path: string; processing_status: GuidelineProcessingStatus }>> {
+  const result = await adminRequest<{
+    success: boolean;
+    guideline_id: string;
+    download_url: string;
+    pdf_s3_path: string;
+    processing_status: GuidelineProcessingStatus;
+  }>(`/guidelines/${encodeURIComponent(guidelineId)}/document`);
+
+  if (result.error || !result.data) {
+    return { data: null, error: result.error ?? 'Failed to fetch guideline document URL' };
+  }
+
+  return {
+    data: {
+      download_url:      result.data.download_url,
+      pdf_s3_path:       result.data.pdf_s3_path,
+      processing_status: result.data.processing_status,
+    },
+    error: null,
+  };
+}
+
+
 // =============================================================================
 // UTILITY — RULE SHAPE MAPPING
 // ReviewExtractedRules (frontend) uses camelCase `ruleText`.

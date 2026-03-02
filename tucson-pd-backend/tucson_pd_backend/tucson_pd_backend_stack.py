@@ -11,7 +11,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-BEDROCK_MODEL_ID = 'us.meta.llama3-3-70b-instruct-v1:0'
+BEDROCK_MODEL_ID = 'us.amazon.nova-pro-v1:0'
 
 class TucsonPdBackendStack(Stack):
 
@@ -128,7 +128,7 @@ class TucsonPdBackendStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler='lambda_function.lambda_handler',
             code=_lambda.Code.from_asset('./lambdas/bedrock_lambda'),
-            timeout=Duration.seconds(360),  # 6 minutes
+            timeout=Duration.seconds(900),  # 15 minutes
             memory_size=1024,
             layers=[pdf_processing_layer],
             environment={
@@ -301,6 +301,10 @@ class TucsonPdBackendStack(Stack):
         # /guidelines/{guideline_id}/rules
         guideline_rules_resource = guideline_id_resource.add_resource('rules')
         guideline_rules_resource.add_method('GET', database_integration)  # Get rules content
+
+        # /guidelines/{guideline_id}/document
+        guideline_document_resource = guideline_id_resource.add_resource('document')
+        guideline_document_resource.add_method('GET', database_integration)  # Get pre-signed URL for original PDF
 
         # ======================================================================
         # STACK OUTPUTS

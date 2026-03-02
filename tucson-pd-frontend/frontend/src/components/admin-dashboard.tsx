@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, FileText, ArrowUpDown, Plus, X, CheckCircle, Trash2, AlertCircle, Loader2, RefreshCw, Eye } from 'lucide-react';
+import { Search, FileText, ArrowUpDown, Plus, X, CheckCircle, Trash2, AlertCircle, Loader2, RefreshCw, Eye, Download, Filter } from 'lucide-react';
 import {
   getAllGuidelines,
   activateGuideline,
   deleteGuideline,
   fetchGuidelineRules,
+  fetchGuidelineDocumentUrl,
   type ApiGuideline,
   type GuidelineDisplayStatus,
   type FrontendRule,
@@ -16,10 +17,11 @@ import {
 // =============================================================================
 
 type SortKey = 'uploadDate-desc' | 'uploadDate-asc' | 'name-asc' | 'name-desc';
+type StatusFilter = 'all' | 'active' | 'inactive' | 'pending' | 'processing' | 'completed' | 'reviewed' | 'failed';
 
 interface AdminDashboardProps {
   onUploadGuideline: () => void;
-  onReviewGuideline: (guidelineId: string, rules: FrontendRule[], fileName: string) => void;
+  onReviewGuideline: (guidelineId: string, rules: FrontendRule[], fileName: string, fileUrl: string | null) => void;
 }
 
 // =============================================================================
@@ -79,6 +81,7 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('uploadDate-desc');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedGuideline, setSelectedGuideline] = useState<ApiGuideline | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -86,6 +89,7 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [isDownloadingDoc, setIsDownloadingDoc] = useState(false);
 
   // ---------------------------------------------------------------------------
   // LOAD
@@ -211,16 +215,43 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
     setReviewingId(guideline.guideline_id);
     setActionError(null);
 
-    const { data: rules, error } = await fetchGuidelineRules(guideline.guideline_id);
+    // Fetch rules and the presigned PDF URL in parallel
+    const [rulesResult, docResult] = await Promise.all([
+      fetchGuidelineRules(guideline.guideline_id),
+      fetchGuidelineDocumentUrl(guideline.guideline_id),
+    ]);
 
     setReviewingId(null);
 
-    if (error || !rules) {
-      setActionError(`Failed to load rules for "${guideline.description}": ${error}`);
+    if (rulesResult.error || !rulesResult.data) {
+      setActionError(`Failed to load rules for "${guideline.description}": ${rulesResult.error}`);
       return;
     }
 
-    onReviewGuideline(guideline.guideline_id, rules, guideline.description);
+    // fileUrl is best-effort — if it fails, the review screen shows the placeholder
+    const fileUrl = docResult.data?.download_url ?? null;
+    if (docResult.error) {
+      console.warn(`[AdminDashboard] Could not fetch PDF URL for ${guideline.guideline_id}: ${docResult.error}`);
+    }
+
+    onReviewGuideline(guideline.guideline_id, rulesResult.data, guideline.description, fileUrl);
+  };
+
+  const handleDownloadDocument = async (guideline: ApiGuideline) => {
+    setIsDownloadingDoc(true);
+    setActionError(null);
+
+    const { data, error } = await fetchGuidelineDocumentUrl(guideline.guideline_id);
+
+    setIsDownloadingDoc(false);
+
+    if (error || !data) {
+      setActionError(`Failed to get download link for "${guideline.description}": ${error}`);
+      return;
+    }
+
+    // Open the presigned URL in a new tab — browser handles the PDF download
+    window.open(data.download_url, '_blank', 'noopener,noreferrer');
   };
 
   // ---------------------------------------------------------------------------
@@ -229,11 +260,15 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
 
   const filtered = guidelines.filter(g => {
     const q = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = (
       g.description.toLowerCase().includes(q) ||
       g.version.toLowerCase().includes(q) ||
       g.uploaded_by_name.toLowerCase().includes(q)
     );
+    const matchesStatus = statusFilter === 'all'
+      || statusFilter === g.status               // 'active' | 'inactive'
+      || statusFilter === g.processing_status;   // 'pending' | 'processing' | 'completed' | 'reviewed' | 'failed'
+    return matchesSearch && matchesStatus;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -364,10 +399,10 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
             </div>
           </div>
 
-          {/* Search + Sort */}
+          {/* Search + Filter + Sort */}
           <div className="mb-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-9 relative">
+              <div className="lg:col-span-6 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
@@ -376,6 +411,27 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
                   placeholder="Search by name, version, or uploaded by..."
                   className="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition-colors"
                 />
+              </div>
+              <div className="lg:col-span-3 relative">
+                <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+                  className="w-full pl-12 pr-4 py-3 bg-white border-2 border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="all">All Statuses</option>
+                  <optgroup label="Activation">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </optgroup>
+                  <optgroup label="Processing">
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Ready for Review</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="failed">Failed</option>
+                  </optgroup>
+                </select>
               </div>
               <div className="lg:col-span-3 relative">
                 <ArrowUpDown className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -424,7 +480,7 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
                           <div className="flex items-center gap-3">
                             <button
                               onClick={() => setSelectedGuideline(guideline)}
-                              className="text-slate-900 hover:text-blue-600 hover:underline transition-colors text-left"
+                              className="text-blue-600 hover:text-blue-800 hover:underline transition-colors text-left"
                             >
                               {guideline.description}
                             </button>
@@ -521,8 +577,8 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
             {sorted.length === 0 && (
               <div className="py-12 text-center">
                 <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                {searchQuery
-                  ? <><p className="text-slate-600 mb-2">No guidelines match your search</p><p className="text-slate-500">Try adjusting your search criteria</p></>
+                {searchQuery || statusFilter !== 'all'
+                  ? <><p className="text-slate-600 mb-2">No guidelines match your search</p><p className="text-slate-500">Try adjusting your search or filter criteria</p></>
                   : <><p className="text-slate-600 mb-2">No guidelines uploaded yet</p><p className="text-slate-500">Click "Upload New Guideline" to get started</p></>
                 }
               </div>
@@ -605,6 +661,17 @@ export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDa
                   Set as Active
                 </button>
               )}
+              <button
+                onClick={() => handleDownloadDocument(selectedGuideline)}
+                disabled={isDownloadingDoc}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDownloadingDoc
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Download className="w-4 h-4" />
+                }
+                {isDownloadingDoc ? 'Fetching…' : 'Download Original PDF'}
+              </button>
               <button
                 onClick={() => setSelectedGuideline(null)}
                 className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors text-sm"

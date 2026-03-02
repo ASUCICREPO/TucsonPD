@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, ArrowLeft, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { PDFPageViewer } from './pdf-page-viewer';
 import {
   createGuideline,
   triggerGuidelineProcessing,
@@ -62,6 +63,7 @@ const PROCESSING_LABELS: Record<GuidelineProcessingStatus, string> = {
 
 export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGuidelineScreenProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -72,10 +74,11 @@ export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGu
   // Abort controller so polling stops if the user navigates away
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Clean up polling on unmount
+  // Clean up polling and blob URL on unmount
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
+      if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     };
   }, []);
 
@@ -89,15 +92,15 @@ export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGu
   const acceptFile = (file: File) => {
     const allowed = [
       'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword',
     ];
     if (!allowed.includes(file.type)) {
-      setErrorMessage('Please upload a PDF or DOCX file.');
+      setErrorMessage('Please upload a PDF file.');
       return;
     }
     setErrorMessage(null);
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     setUploadedFile(file);
+    setFilePreviewUrl(file.type === 'application/pdf' ? URL.createObjectURL(file) : null);
     setPhase('ready');
   };
 
@@ -124,7 +127,9 @@ export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGu
   };
 
   const handleReplaceFile = () => {
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     setUploadedFile(null);
+    setFilePreviewUrl(null);
     setPhase('idle');
     setErrorMessage(null);
   };
@@ -302,7 +307,7 @@ export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGu
             <div className="mb-6">
               <h2 className="text-slate-900 mb-2">Upload New Guideline Document</h2>
               <p className="text-slate-600">
-                Provide a name and upload a PDF or DOCX guidelines document.
+                Provide a name and upload a PDF guidelines document.
                 The system will extract redaction rules automatically.
               </p>
             </div>
@@ -358,11 +363,11 @@ export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGu
                   <input
                     id="guideline-file-upload"
                     type="file"
-                    accept=".pdf,.doc,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                    accept=".pdf,application/pdf"
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <p className="text-slate-500">Accepted formats: PDF, DOCX</p>
+                  <p className="text-slate-500">Accepted format: PDF</p>
                 </div>
               </div>
             ) : (
@@ -391,6 +396,16 @@ export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGu
                       </button>
                     </div>
                   </div>
+
+                  {/* PDF preview — only available for PDF uploads, not DOCX */}
+                  {filePreviewUrl && (
+                    <div className="mt-4 max-h-[600px] overflow-y-auto border border-slate-200 rounded-lg p-4 bg-white">
+                      <PDFPageViewer
+                        fileUrl={filePreviewUrl}
+                        fileName={uploadedFile.name}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Submit */}

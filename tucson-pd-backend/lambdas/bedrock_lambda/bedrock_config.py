@@ -60,8 +60,8 @@ default_temperature = 0.3
 # Max tokens for document summary
 document_summary_max_tokens = 2000
 
-# Max tokens for page analysis (needs room for JSON output with multiple redactions)
-page_analysis_max_tokens = 4096
+# Was 4096 — increase to give room for dense pages with many redactions
+page_analysis_max_tokens = 8192
 
 # Max tokens for guidelines conversion. Nova Pro has a hard 5000 output token
 # cap. The stopReason check in convert_guidelines.py will raise explicitly if
@@ -108,16 +108,15 @@ def get_prompt(type, page_text=None, guidelines=None, doc_summary=None, page_num
                 
             case "page_analysis":
                 # Validate required parameters
-                if page_text is None:
-                    raise KeyError("page_text is required for page_analysis prompt")
                 if guidelines is None:
                     raise KeyError("guidelines is required for page_analysis prompt")
                 if page_number is None:
                     raise KeyError("page_number is required for page_analysis prompt")
                 
                 # Format prompt with dynamic content
+                # Note: page_text removed — page content is now passed as an image
+                # in the user message, not as text in the system prompt
                 prompt = page_analysis.page_analysis_prompt.format(
-                    page_text=page_text,
                     guidelines=guidelines,
                     document_summary=doc_summary or "No document summary available",
                     page_number=page_number

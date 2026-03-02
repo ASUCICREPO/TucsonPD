@@ -3,8 +3,8 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { FileText, Loader2 } from 'lucide-react';
 
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configure PDF.js worker — use unpkg which mirrors every pdfjs version immediately
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface PDFPageViewerProps {
   fileUrl: string | null;

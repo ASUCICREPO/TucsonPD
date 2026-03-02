@@ -331,13 +331,13 @@ def delete_case(case_id: str) -> None:
         deleted_files = []
 
         for path_type, s3_path in s3_paths.items():
-            if s3_path:
-                try:
-                    delete_s3_object(s3_path)
-                    deleted_files.append(path_type)
-                    logger.info(f"Deleted S3 file: {path_type} ({s3_path})")
-                except Exception as e:
-                    logger.warning(f"Failed to delete S3 file {path_type}: {str(e)}")
+            path_to_delete = s3_path or build_s3_path(case_id, path_type)
+            try:
+                delete_s3_object(path_to_delete)
+                deleted_files.append(path_type)
+                logger.info(f"Deleted S3 file: {path_type} ({path_to_delete})")
+            except Exception as e:
+                logger.warning(f"Failed to delete S3 file {path_type}: {str(e)}")
 
         delete_dynamodb_item(case_id)
 

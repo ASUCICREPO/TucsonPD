@@ -11,7 +11,7 @@ import { GuidelineSavedConfirmation } from './components/guideline-saved-confirm
 import { User, LogOut, ChevronDown } from 'lucide-react';
 import { Toaster } from "sonner";
 import { setOfficerIdentity, getCaseById, mapBackendStatus } from './components/apigatewaymanager';
-import { setAdminIdentity } from './components/adminapimanager';
+import { setAdminIdentity, fetchGuidelineDocumentUrl } from './components/adminapimanager';
 import type { FrontendRule } from './components/adminapimanager';
 
 type FlowStep = 'sign-in' | 'dashboard' | 'intake-form' | 'case-detail' | 'admin-dashboard' | 'upload-guideline' | 'review-rules' | 'guideline-saved';
@@ -33,6 +33,7 @@ function AppInner() {
     guidelineId: string;
     rules: FrontendRule[];
     fileName: string;
+    fileUrl: string | null;
   } | null>(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
@@ -469,8 +470,8 @@ function AppInner() {
         return (
           <AdminDashboard
             onUploadGuideline={() => setCurrentStep('upload-guideline')}
-            onReviewGuideline={(guidelineId, rules, fileName) => {
-              setGuidelineUploadState({ guidelineId, rules, fileName });
+            onReviewGuideline={(guidelineId, rules, fileName, fileUrl) => {
+              setGuidelineUploadState({ guidelineId, rules, fileName, fileUrl });
               setCurrentStep('review-rules');
             }}
           />
@@ -480,7 +481,10 @@ function AppInner() {
           <UploadGuidelineScreen
             onBack={() => setCurrentStep('admin-dashboard')}
             onProcessingComplete={async (guidelineId, rules, fileName) => {
-              setGuidelineUploadState({ guidelineId, rules, fileName });
+              // Fetch the presigned PDF URL so the review screen can show the preview
+              const { data: docData } = await fetchGuidelineDocumentUrl(guidelineId);
+              const fileUrl = docData?.download_url ?? null;
+              setGuidelineUploadState({ guidelineId, rules, fileName, fileUrl });
               setCurrentStep('review-rules');
             }}
           />
@@ -495,7 +499,7 @@ function AppInner() {
             guidelineId={guidelineUploadState.guidelineId}
             fileName={guidelineUploadState.fileName}
             extractedRules={guidelineUploadState.rules}
-            fileUrl={null}
+            fileUrl={guidelineUploadState.fileUrl}
             onSaveGuideline={(guidelineId: string) => {
               setCurrentStep('guideline-saved');
             }}
@@ -542,10 +546,10 @@ function AppInner() {
               <span className="text-slate-300">{currentUser?.name}</span>
               <ChevronDown className="w-4 h-4 text-slate-400" />
               {showProfileDropdown && (
-                <div className="absolute right-0 top-[calc(100%+4px)] w-56 bg-white rounded-md shadow-lg z-10 py-1">
+                <div className="absolute right-0 top-[calc(100%+4px)] min-w-56 bg-white rounded-md shadow-lg z-10 py-1">
                   <div className="px-4 py-2 border-b border-slate-200">
-                    <p className="text-slate-900 font-medium">{currentUser?.name}</p>
-                    <p className="text-slate-500 text-sm">{currentUser?.email}</p>
+                    <p className="text-slate-900 font-medium whitespace-nowrap">{currentUser?.name}</p>
+                    <p className="text-slate-500 text-sm whitespace-nowrap">{currentUser?.email}</p>
                   </div>
                   <button
                     className="flex items-center px-4 py-2 text-red-600 hover:bg-slate-100 w-full text-left transition-colors"

@@ -303,6 +303,65 @@ def get_guideline_rules(guideline_id: str) -> Dict[str, Any]:
         raise
 
 
+def get_guideline_document_url(guideline_id: str) -> Dict[str, Any]:
+    """
+    Generate a pre-signed GET URL for downloading the original PDF of a guideline.
+    Available for any guideline regardless of processing status, as long as the
+    record exists (the PDF is uploaded before processing begins).
+
+    Args:
+        guideline_id: Unique guideline identifier
+
+    Returns:
+        Dictionary containing:
+            - guideline_id: The guideline identifier
+            - download_url: Pre-signed GET URL for the PDF (valid for PRESIGNED_URL_EXPIRATION seconds)
+            - pdf_s3_path: The raw S3 path for reference
+            - processing_status: Current processing status of the guideline
+
+    Raises:
+        ValueError: If guideline not found
+        Exception: If S3 pre-signed URL generation fails
+    """
+    logger.info(f"Generating PDF download URL for guideline: {guideline_id}")
+
+    try:
+        guideline = get_guidelines_item(guideline_id)
+        if not guideline:
+            raise ValueError(f"Guideline not found: {guideline_id}")
+
+        pdf_s3_path = guideline.get('pdf_s3_path')
+        if not pdf_s3_path:
+            raise ValueError(f"No PDF path found for guideline: {guideline_id}")
+
+        # Strip the s3://bucket/ prefix to get the bare S3 key
+        bucket = S3_BUCKET_NAME
+        key = pdf_s3_path.replace(f"s3://{bucket}/", "")
+
+        # Generate pre-signed GET URL
+        download_url = generate_presigned_url(
+            bucket=bucket,
+            key=key,
+            expires_in=PRESIGNED_URL_EXPIRATION,
+            method='GET'
+        )
+
+        logger.info(f"Successfully generated PDF download URL for guideline: {guideline_id}")
+
+        return {
+            'guideline_id': guideline_id,
+            'download_url': download_url,
+            'pdf_s3_path': pdf_s3_path,
+            'processing_status': guideline.get('processing_status'),
+        }
+
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate PDF download URL for {guideline_id}: {str(e)}", exc_info=True)
+        raise
+
+
 def update_guideline_json(
     guideline_id: str,
     guidelines_json: Dict[str, Any],
