@@ -12,6 +12,7 @@ import { User, LogOut, ChevronDown } from 'lucide-react';
 import { Toaster } from "sonner";
 import { setOfficerIdentity, getCaseById, mapBackendStatus } from './components/apigatewaymanager';
 import { setAdminIdentity } from './components/adminapimanager';
+import type { FrontendRule } from './components/adminapimanager';
 
 type FlowStep = 'sign-in' | 'dashboard' | 'intake-form' | 'case-detail' | 'admin-dashboard' | 'upload-guideline' | 'review-rules' | 'guideline-saved';
 
@@ -30,7 +31,7 @@ function AppInner() {
   const [intakeFormData, setIntakeFormData] = useState<IntakeFormData | null>(null);
   const [guidelineUploadState, setGuidelineUploadState] = useState<{
     guidelineId: string;
-    rules: any[];
+    rules: FrontendRule[];
     fileName: string;
   } | null>(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -468,13 +469,17 @@ function AppInner() {
         return (
           <AdminDashboard
             onUploadGuideline={() => setCurrentStep('upload-guideline')}
+            onReviewGuideline={(guidelineId, rules, fileName) => {
+              setGuidelineUploadState({ guidelineId, rules, fileName });
+              setCurrentStep('review-rules');
+            }}
           />
         );
       case 'upload-guideline':
         return (
           <UploadGuidelineScreen
             onBack={() => setCurrentStep('admin-dashboard')}
-            onProcessingComplete={(guidelineId, rules, fileName) => {
+            onProcessingComplete={async (guidelineId, rules, fileName) => {
               setGuidelineUploadState({ guidelineId, rules, fileName });
               setCurrentStep('review-rules');
             }}
@@ -487,13 +492,17 @@ function AppInner() {
         }
         return (
           <ReviewExtractedRules
+            guidelineId={guidelineUploadState.guidelineId}
             fileName={guidelineUploadState.fileName}
             extractedRules={guidelineUploadState.rules}
             fileUrl={null}
             onSaveGuideline={(guidelineId: string) => {
               setCurrentStep('guideline-saved');
             }}
-            onBackToUpload={() => setCurrentStep('upload-guideline')}
+            onBackToUpload={() => {
+              setGuidelineUploadState(null);
+              setCurrentStep('admin-dashboard');
+            }}
           />
         );
       case 'guideline-saved':

@@ -5,7 +5,7 @@ import {
   triggerGuidelineProcessing,
   pollGuidelineUntilReady,
   uploadFileToS3,
-  extractFrontendRules,
+  fetchGuidelineRules,
   type FrontendRule,
   type GuidelineProcessingStatus,
 } from './adminapimanager';
@@ -193,16 +193,17 @@ export function UploadGuidelineScreen({ onBack, onProcessingComplete }: UploadGu
       return;
     }
 
-    // ── Step 5: Extract rules and hand off to parent ─────────────────────────
-    const guidelinesContent = pollResult.data?.guidelines_content;
+    // ── Step 5: Fetch extracted rules and hand off to parent ─────────────────
+    // pollGuidelineUntilReady resolves via getAllGuidelines which does NOT
+    // attach guidelines_content — fetch the rules directly via the new endpoint.
+    const { data: frontendRules, error: rulesError } = await fetchGuidelineRules(guideline_id);
 
-    if (!guidelinesContent || !guidelinesContent.guidelines?.length) {
+    if (rulesError || !frontendRules?.length) {
       setPhase('error');
-      setErrorMessage('Processing completed but no rules were extracted. Please try again or check the document format.');
+      setErrorMessage(rulesError ?? 'Processing completed but no rules were extracted. Please try again or check the document format.');
       return;
     }
 
-    const frontendRules = extractFrontendRules(guidelinesContent);
     onProcessingComplete(guideline_id, frontendRules, uploadedFile.name);
   };
 

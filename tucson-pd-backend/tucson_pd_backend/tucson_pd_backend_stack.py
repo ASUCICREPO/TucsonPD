@@ -298,6 +298,10 @@ class TucsonPdBackendStack(Stack):
         guideline_activate_resource = guideline_id_resource.add_resource('activate')
         guideline_activate_resource.add_method('PUT', database_integration)
 
+        # /guidelines/{guideline_id}/rules
+        guideline_rules_resource = guideline_id_resource.add_resource('rules')
+        guideline_rules_resource.add_method('GET', database_integration)  # Get rules content
+
         # ======================================================================
         # STACK OUTPUTS
         # ======================================================================

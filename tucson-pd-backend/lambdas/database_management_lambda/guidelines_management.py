@@ -257,6 +257,52 @@ def get_active_guideline() -> Optional[Dict[str, Any]]:
         raise
 
 
+def get_guideline_rules(guideline_id: str) -> Dict[str, Any]:
+    """
+    Get the extracted rules JSON for any completed or reviewed guideline.
+    Used by the admin review screen to load rules for editing.
+
+    Args:
+        guideline_id: Unique guideline identifier
+
+    Returns:
+        Guideline metadata dict with guidelines_content attached
+
+    Raises:
+        ValueError: If guideline not found or rules not ready
+        Exception: If S3 operation fails
+    """
+    logger.info(f"Retrieving rules for guideline: {guideline_id}")
+
+    try:
+        guideline = get_guidelines_item(guideline_id)
+        if not guideline:
+            raise ValueError(f"Guideline not found: {guideline_id}")
+
+        if guideline['processing_status'] not in ('completed', 'reviewed'):
+            raise ValueError(
+                f"Guideline rules are not ready. Current processing status: {guideline['processing_status']}"
+            )
+
+        json_s3_path = guideline['json_s3_path']
+        bucket = S3_BUCKET_NAME
+        key = json_s3_path.replace(f"s3://{bucket}/", "")
+
+        json_bytes = download_from_s3(bucket=bucket, key=key)
+        guidelines_json = json.loads(json_bytes.decode('utf-8'))
+
+        guideline['guidelines_content'] = guidelines_json
+
+        logger.info(f"Retrieved rules for guideline: {guideline_id}")
+        return guideline
+
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get guideline rules for {guideline_id}: {str(e)}", exc_info=True)
+        raise
+
+
 def update_guideline_json(
     guideline_id: str,
     guidelines_json: Dict[str, Any],
@@ -307,7 +353,7 @@ def update_guideline_json(
         update_guidelines_item(guideline_id, {
             'updated_at': timestamp,
             'updated_by': admin_id,
-            'processing_status': 'completed'  # Mark as completed after review
+            'processing_status': 'reviewed'  # Human has reviewed and saved — ready to activate
         })
         
         # Get updated guideline
@@ -347,9 +393,12 @@ def activate_guideline(guideline_id: str, admin_id: str) -> Dict[str, Any]:
         if not guideline:
             raise ValueError(f"Guideline not found: {guideline_id}")
         
-        # Verify it's ready to be activated (JSON must be completed)
-        if guideline['processing_status'] != 'completed':
-            raise ValueError(f"Guideline must be in 'completed' status to activate. Current status: {guideline['processing_status']}")
+        # Verify it's ready to be activated (must have been human-reviewed)
+        if guideline['processing_status'] != 'reviewed':
+            raise ValueError(
+                f"Guideline must be reviewed by an admin before activation. "
+                f"Current status: {guideline['processing_status']}"
+            )
         
         # Deactivate all other guidelines
         all_guidelines = query_all_guidelines()

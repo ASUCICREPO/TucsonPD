@@ -63,8 +63,10 @@ document_summary_max_tokens = 2000
 # Max tokens for page analysis (needs room for JSON output with multiple redactions)
 page_analysis_max_tokens = 4096
 
-# Max tokens for guidelines conversion (needs room for complete guidelines JSON)
-guidelines_conversion_max_tokens = 8192
+# Max tokens for guidelines conversion. Nova Pro has a hard 5000 output token
+# cap. The stopReason check in convert_guidelines.py will raise explicitly if
+# the response is truncated rather than passing broken JSON to the validator.
+guidelines_conversion_max_tokens = 5000
 
 # Default max tokens
 default_max_tokens = 4096
@@ -85,7 +87,8 @@ def get_prompt(type, page_text=None, guidelines=None, doc_summary=None, page_num
         guidelines: JSON string of redaction guidelines (for page_analysis)
         doc_summary: Summary of entire document (for page_analysis context)
         page_number: Current page number being analyzed (for page_analysis)
-        guidelines_text: Full text of guidelines PDF (for guidelines_conversion)
+        guidelines_text: Unused. PDF is passed as a native document block in the
+            user message; the guidelines_conversion system prompt is static instructions only.
     
     Returns:
         List containing formatted prompt in Bedrock system message format
@@ -121,14 +124,9 @@ def get_prompt(type, page_text=None, guidelines=None, doc_summary=None, page_num
                 )
                 
             case "guidelines_conversion":
-                # Validate required parameters
-                if guidelines_text is None:
-                    raise KeyError("guidelines_text is required for guidelines_conversion prompt")
-                
-                # Format prompt with guidelines text
-                prompt = guidelines_conversion.guidelines_conversion_prompt.format(
-                    guidelines_text=guidelines_text
-                )
+                # The PDF is passed as a native document block in the user message,
+                # so the system prompt is static conversion instructions only.
+                prompt = guidelines_conversion.guidelines_conversion_prompt
                 
             case _:
                 logger.warning(f"Unknown prompt type: {type}, using error prompt")

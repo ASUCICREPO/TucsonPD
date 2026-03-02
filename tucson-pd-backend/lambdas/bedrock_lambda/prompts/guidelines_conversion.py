@@ -1,30 +1,46 @@
 """
 Guidelines Conversion Prompt
 
-This prompt is used to convert guideline PDFs into structured JSON rules.
-It receives the full text of the guidelines document and must output a JSON
-structure that defines redaction categories, descriptions, priorities, and examples.
+This prompt converts law enforcement redaction guideline PDFs into structured
+JSON rules optimized for LLM consumption during document analysis.
 
-Expected Input Variable (formatted via .format()):
-- {guidelines_text}: Full text content extracted from the guidelines PDF
+The PDF is passed directly to Bedrock as a native document block — no text
+extraction or .format() substitution is needed. The prompt is static instructions only.
 
-Expected Output: JSON object with the following structure:
-{{
+Design Philosophy:
+    The output JSON is NOT intended for programmatic pattern matching. It is a
+    structured briefing document that a downstream LLM will reason against when
+    analyzing case reports page by page.
+
+    Priority is on capturing high-impact redaction rules accurately over achieving
+    exhaustive completeness. A rule that applies broadly (all cases, all roles) or
+    protects a clearly sensitive category (juvenile identity, SSN, medical info)
+    is more valuable than edge-case requestor rules or minor procedural notes.
+
+    Rules about WHO receives the report (requestor-based release rules) are out
+    of scope — the page analysis model has no visibility into who requested the
+    report, so those rules cannot inform per-page redaction decisions.
+
+Output Structure:
+{
     "version": "1.0",
-    "guidelines": [
-        {{
-            "category": "PII_NAME",
-            "description": "Redact all personal names of civilians",
-            "priority": "HIGH",
-            "examples": ["John Doe", "Jane Smith"],
-            "pattern": "optional regex pattern"
-        }},
-        ...
+    "rules": [
+        {
+            "id": 1,
+            "description": "...",
+            "applies_to": ["victim_adult", "witness_adult"],
+            "conditions": ["all cases"],
+            "exceptions": ["Victim provides signed notarized request form"]
+        }
     ]
-}}
+}
 
-Categories should follow naming convention: PII_*, VEHICLE_*, SENSITIVE_*
-Priority levels: LOW, MEDIUM, HIGH, CRITICAL
+Field notes:
+    - exceptions: first-class field, not buried in description
+    - applies_to: role-based targeting using the defined vocabulary
+    - conditions: case-type or situational constraints
+    - No examples field — the source document rarely provides them and the
+      field adds token overhead without improving downstream reasoning
 """
 
 import logging
@@ -33,75 +49,103 @@ import constants  # This configures logging
 logger = logging.getLogger(__name__)
 
 guidelines_conversion_prompt = """
-You are an expert in law enforcement document redaction policy. Your task is to read a guidelines document and convert it into a structured JSON format that defines redaction rules.
+You are an expert in law enforcement records and document redaction policy. Your task is to read a redaction guidelines document and convert it into a structured JSON format that will be used by another AI model to make redaction decisions on real case reports.
 
-## Your Task
-Carefully read the guidelines document provided below. Extract every distinct redaction rule, requirement, or category mentioned. For each rule, produce a JSON object following the exact schema described below.
+## Purpose and Priority
+
+This JSON is a structured briefing document, not a pattern-matching ruleset. The model that reads it will reason against these rules page by page — identifying who is mentioned, what type of case it is, and what must be redacted given that combination.
+
+The goal is not exhaustive completeness. It is accurate coverage of the rules that matter most. Prioritize accordingly:
+
+- Rules that apply broadly (all roles, all cases) are highest priority — get these exactly right
+- Rules that protect clearly sensitive categories (juvenile identity, SSN, DOB, DL, medical info, sexual assault victims) are highest priority
+- Rules where the redacted content differs meaningfully by role or case type should be split into separate entries
+- Minor procedural notes, administrative guidance, and supervisor consultation instructions are lowest priority and can be omitted if token budget is a concern
+- Rules about who RECEIVES the report (requestor-based release rules such as "release to COT Risk Management without redactions") are OUT OF SCOPE — do not include them. The page analysis model cannot see who requested the report and cannot act on these rules.
 
 ## Output Schema
-You must output a single JSON object with exactly this structure:
-{{
+
+Output a single JSON object with exactly this structure:
+
+{
     "version": "1.0",
-    "guidelines": [
-        {{
-            "category": "CATEGORY_NAME",
-            "description": "Clear description of what must be redacted and why",
-            "priority": "PRIORITY_LEVEL",
-            "examples": ["example 1", "example 2"],
-            "pattern": "optional regex pattern if applicable"
-        }}
+    "rules": [
+        {
+            "id": 1,
+            "description": "Clear, precise description of what must be redacted, written closely to the source document's own language",
+            "applies_to": ["list of roles or subjects this rule targets"],
+            "conditions": ["situational constraints under which this rule applies"],
+            "exceptions": ["legally significant exceptions — when this rule does NOT apply or is modified"]
+        }
     ]
-}}
+}
 
-## Field Rules
+## Field-by-Field Instructions
 
-**category** (required, string)
-- Use the naming convention PREFIX_TYPE, where prefix is one of:
-  - PII_ for personally identifiable information (names, addresses, SSNs, DOBs, phone numbers, emails, etc.)
-  - VEHICLE_ for vehicle-related information (plate numbers, VINs, descriptions)
-  - SENSITIVE_ for sensitive case details (informant info, juvenile records, medical info, etc.)
-  - LEGAL_ for legally protected information (attorney details, sealed records, etc.)
-  - FINANCIAL_ for financial information (account numbers, credit cards, etc.)
-- Use ALL_CAPS with underscores
-- Be specific: prefer PII_SSN over PII_NUMBER, PII_HOME_ADDRESS over PII_ADDRESS
-- Each category must be unique across the entire guidelines array
+**id** (required, integer)
+- Sequential integer starting at 1
+- Used by the downstream model to cite which rule justified a redaction decision
 
 **description** (required, string)
-- Write a clear, actionable sentence describing exactly what text must be redacted
-- Include the reason if the guidelines document provides one
-- Example: "Redact all Social Security Numbers to protect civilian privacy in accordance with ARS 41-4172"
+- The most important field — write it to be unambiguous and actionable
+- Stay close to the source document's wording; do not paraphrase into generic language
+- When the source enumerates specific fields, reproduce that list exactly: if it says "SSN, DL numbers, DOB, and FBI & SID numbers" write those exact items — do not collapse them into "government identifiers"
+- Include the legal citation if the source document provides one (e.g. ARS 13-4434)
+- For role-differentiated rules, state the role in the description: "Redact juvenile witness name, DOB, SSN..." not just "Redact name, DOB, SSN..."
 
-**priority** (required, string)
-- Must be exactly one of: "LOW", "MEDIUM", "HIGH", "CRITICAL"
-- Use the following criteria:
-  - CRITICAL: Legally mandated redactions, federal/state law requirements, juvenile information
-  - HIGH: Strong privacy interests, sensitive personal data (SSN, DOB, home address)
-  - MEDIUM: General PII that could enable identification or contact (phone, email, employer)
-  - LOW: Contextual details that are preferable but not legally required to redact
-- If the guidelines document assigns explicit priority levels, map those to the above scale
+**applies_to** (required, array of strings)
+- Who this rule targets. Use these values:
+  - "all" — applies regardless of role
+  - "victim_adult"
+  - "victim_juvenile"
+  - "victim_sexual_assault"
+  - "witness_adult"
+  - "witness_juvenile"
+  - "suspect_adult"
+  - "suspect_juvenile"
+  - "arrestee_adult"
+  - "arrestee_juvenile"
+  - "other_involved_adult"
+  - "other_involved_juvenile"
+  - "no_nibrs_adult"
+  - "no_nibrs_juvenile"
+  - "government_employee"
+  - "refused_party"
+  - "confidential_informant"
+  - "undercover_officer"
+- Use multiple values only when the roles share identical redaction requirements
+- Use ["all"] only when the rule genuinely applies to every role without variation
 
-**examples** (required, array of strings)
-- Provide 2-5 realistic example values that would be redacted under this rule
-- Use realistic but clearly fictitious values (e.g. "John Doe", "123-45-6789", "AZ ABC1234")
-- If no examples are apparent from the guidelines, generate representative ones based on the category
-- Never leave this as an empty array — always include at least one example
+**conditions** (required, array of strings)
+- Situational constraints that determine when this rule is active
+- Examples: "open case", "closed case", "civil case", "criminal case", "collision report", "felony charge", "misdemeanor charge"
+- Use ["all cases"] only when the rule applies regardless of case type
+- Be specific — "open felony case" is more useful than just "felony"
 
-**pattern** (optional, string or null)
-- Provide a regex pattern if the redaction target has a consistent, machine-matchable format
-- Examples: SSNs "\\d{{3}}-\\d{{2}}-\\d{{4}}", phone numbers "\\(?\\d{{3}}\\)?[-.\\s]?\\d{{3}}[-.\\s]?\\d{{4}}"
-- Set to null if the target is free-form text without a reliable pattern (e.g. names, narratives)
+**exceptions** (required, array of strings)
+- When this rule does NOT apply, or applies differently
+- These are legally significant — capture them completely and in the source document's own language
+- If there are no exceptions, use an empty array []
+- If a rule has a sub-exception to an exception, include it as a parenthetical within the same string
+
+## When to Split vs. Combine Rules
+
+Split a rule into separate entries when the redacted content differs between situations:
+- Adult victim vs. juvenile victim: name is redacted for juvenile but not adult → two rules
+- Open case suspect vs. closed case suspect: different fields are redacted → two rules
+- Physical identifiers for victims/witnesses (all cases) vs. suspects (open cases only) → two rules
+
+Combine into one rule when the redacted content is identical across roles or situations:
+- If adult and juvenile witnesses both require the exact same fields redacted, one rule with both in applies_to is correct
+- Do not split solely because section headers in the source document treat them separately
 
 ## Critical Output Requirements
-- Output ONLY the raw JSON object. No preamble, no explanation, no markdown, no code fences.
-- The "guidelines" value MUST be a JSON array (list), even if there is only one rule.
-- Every item in the guidelines array must be a JSON object with all required fields.
-- Do not include any text before the opening {{ or after the closing }}.
-- Ensure the JSON is valid and parseable — check that all strings are quoted, arrays are bracketed, and objects are braced.
-- If a guideline in the document covers multiple distinct types of information, split it into multiple separate entries in the array.
-- Do not collapse multiple redaction types into a single category entry.
 
-## Guidelines Document Text
-{guidelines_text}
+- Output ONLY the raw JSON object. No preamble, no explanation, no markdown, no code fences.
+- The "rules" value MUST be a JSON array, even if there is only one rule.
+- Every rule must have all five fields present; exceptions can be an empty array but must be present.
+- Do not include any text before the opening { or after the closing }.
+- Ensure the JSON is valid and parseable.
 """
 
 logger.info("Guidelines conversion prompt loaded successfully")

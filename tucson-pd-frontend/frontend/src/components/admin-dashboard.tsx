@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, FileText, ArrowUpDown, Plus, X, CheckCircle, Trash2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Search, FileText, ArrowUpDown, Plus, X, CheckCircle, Trash2, AlertCircle, Loader2, RefreshCw, Eye } from 'lucide-react';
 import {
   getAllGuidelines,
   activateGuideline,
   deleteGuideline,
+  fetchGuidelineRules,
   type ApiGuideline,
   type GuidelineDisplayStatus,
+  type FrontendRule,
   mapGuidelineProcessingStatus,
 } from './adminapimanager';
 
@@ -17,6 +19,7 @@ type SortKey = 'uploadDate-desc' | 'uploadDate-asc' | 'name-asc' | 'name-desc';
 
 interface AdminDashboardProps {
   onUploadGuideline: () => void;
+  onReviewGuideline: (guidelineId: string, rules: FrontendRule[], fileName: string) => void;
 }
 
 // =============================================================================
@@ -43,17 +46,19 @@ function formatFileSize(s3Path: string): string {
 
 function ProcessingBadge({ status }: { status: GuidelineDisplayStatus }) {
   const styles: Record<GuidelineDisplayStatus, string> = {
-    Pending:    'bg-slate-100 text-slate-600 border-slate-200',
-    Processing: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    Ready:      'bg-blue-100 text-blue-700 border-blue-200',
-    Failed:     'bg-red-100 text-red-700 border-red-200',
+    Pending:           'bg-slate-100 text-slate-600 border-slate-200',
+    Processing:        'bg-yellow-100 text-yellow-700 border-yellow-200',
+    'Ready for Review': 'bg-blue-100 text-blue-700 border-blue-200',
+    Reviewed:          'bg-emerald-100 text-emerald-700 border-emerald-200',
+    Failed:            'bg-red-100 text-red-700 border-red-200',
   };
 
   const icons: Record<GuidelineDisplayStatus, JSX.Element> = {
-    Pending:    <Loader2 className="w-3 h-3" />,
-    Processing: <Loader2 className="w-3 h-3 animate-spin" />,
-    Ready:      <CheckCircle className="w-3 h-3" />,
-    Failed:     <AlertCircle className="w-3 h-3" />,
+    Pending:           <Loader2 className="w-3 h-3" />,
+    Processing:        <Loader2 className="w-3 h-3 animate-spin" />,
+    'Ready for Review': <Eye className="w-3 h-3" />,
+    Reviewed:          <CheckCircle className="w-3 h-3" />,
+    Failed:            <AlertCircle className="w-3 h-3" />,
   };
 
   return (
@@ -68,7 +73,7 @@ function ProcessingBadge({ status }: { status: GuidelineDisplayStatus }) {
 // COMPONENT
 // =============================================================================
 
-export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
+export function AdminDashboard({ onUploadGuideline, onReviewGuideline }: AdminDashboardProps) {
   const [guidelines, setGuidelines] = useState<ApiGuideline[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -80,6 +85,7 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // LOAD
@@ -105,6 +111,44 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
     loadGuidelines();
   }, [loadGuidelines]);
 
+  // Silent background refresh — doesn't show the loading spinner so the
+  // table doesn't flash. Used by the auto-refresh interval.
+  const silentRefresh = useCallback(async () => {
+    const { data } = await getAllGuidelines();
+    if (data) setGuidelines(data.guidelines);
+  }, []);
+
+  // Auto-refresh every 30 seconds while any guideline is still processing.
+  // Stops automatically once all guidelines have left the pending/processing state.
+  const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const hasProcessing = guidelines.some(
+      g => g.processing_status === 'pending' || g.processing_status === 'processing'
+    );
+
+    if (hasProcessing) {
+      // Start interval if not already running
+      if (!autoRefreshRef.current) {
+        autoRefreshRef.current = setInterval(silentRefresh, 30_000);
+      }
+    } else {
+      // No in-progress guidelines — clear the interval
+      if (autoRefreshRef.current) {
+        clearInterval(autoRefreshRef.current);
+        autoRefreshRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (autoRefreshRef.current) {
+        clearInterval(autoRefreshRef.current);
+        autoRefreshRef.current = null;
+      }
+    };
+  }, [guidelines, silentRefresh]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadGuidelines();
@@ -118,9 +162,13 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
   const handleActivate = async (guideline: ApiGuideline) => {
     if (guideline.status === 'active') return;
 
-    // Must be processing_status === 'completed' to activate
-    if (guideline.processing_status !== 'completed') {
-      setActionError(`"${guideline.description}" cannot be activated — it hasn't finished processing yet.`);
+    // Must be processing_status === 'reviewed' to activate
+    if (guideline.processing_status !== 'reviewed') {
+      setActionError(
+        guideline.processing_status === 'completed'
+          ? `"${guideline.description}" must be reviewed before it can be activated.`
+          : `"${guideline.description}" cannot be activated — it hasn't finished processing yet.`
+      );
       return;
     }
 
@@ -157,6 +205,22 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
     }
 
     setDeletingId(null);
+  };
+
+  const handleReviewRules = async (guideline: ApiGuideline) => {
+    setReviewingId(guideline.guideline_id);
+    setActionError(null);
+
+    const { data: rules, error } = await fetchGuidelineRules(guideline.guideline_id);
+
+    setReviewingId(null);
+
+    if (error || !rules) {
+      setActionError(`Failed to load rules for "${guideline.description}": ${error}`);
+      return;
+    }
+
+    onReviewGuideline(guideline.guideline_id, rules, guideline.description);
   };
 
   // ---------------------------------------------------------------------------
@@ -347,8 +411,10 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
                     const displayStatus = mapGuidelineProcessingStatus(guideline.processing_status);
                     const isActivating = activatingId === guideline.guideline_id;
                     const isDeleting = deletingId === guideline.guideline_id;
-                    const canActivate = guideline.processing_status === 'completed' && guideline.status !== 'active';
+                    const isReviewing = reviewingId === guideline.guideline_id;
+                    const canActivate = guideline.processing_status === 'reviewed' && guideline.status !== 'active';
                     const canDelete = guideline.status !== 'active';
+                    const canReview = guideline.processing_status === 'completed'; // only before human review
 
                     return (
                       <tr key={guideline.guideline_id} className="hover:bg-slate-50 transition-colors">
@@ -390,6 +456,25 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
 
+                            {/* Review Rules */}
+                            <button
+                              onClick={() => handleReviewRules(guideline)}
+                              disabled={!canReview || isReviewing || isActivating || isDeleting}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={
+                                guideline.processing_status === 'reviewed'
+                                  ? 'Already reviewed — activate from dashboard'
+                                  : guideline.processing_status !== 'completed'
+                                  ? 'Rules not ready yet'
+                                  : 'Review & edit rules'
+                              }
+                            >
+                              {isReviewing
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <Eye className="w-4 h-4" />
+                              }
+                            </button>
+
                             {/* Activate */}
                             <button
                               onClick={() => handleActivate(guideline)}
@@ -398,7 +483,9 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
                               title={
                                 guideline.status === 'active'
                                   ? 'Already active'
-                                  : guideline.processing_status !== 'completed'
+                                  : guideline.processing_status === 'completed'
+                                  ? 'Must be reviewed before activating'
+                                  : guideline.processing_status !== 'reviewed'
                                   ? 'Must finish processing before activating'
                                   : 'Set as active'
                               }
@@ -507,7 +594,7 @@ export function AdminDashboard({ onUploadGuideline }: AdminDashboardProps) {
 
             {/* Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
-              {selectedGuideline.status !== 'active' && selectedGuideline.processing_status === 'completed' && (
+              {selectedGuideline.status !== 'active' && selectedGuideline.processing_status === 'reviewed' && (
                 <button
                   onClick={async () => {
                     setSelectedGuideline(null);

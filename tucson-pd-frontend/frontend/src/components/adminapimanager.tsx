@@ -41,17 +41,18 @@ const API_BASE_URL = REST_API_URL.endsWith('/')
 // =============================================================================
 // PROCESSING STATUS CONSTANTS
 // Maps the backend processing_status field to a UI-friendly display value.
-// Backend values: 'pending' | 'processing' | 'completed' | 'failed'
+// Backend values: 'pending' | 'processing' | 'completed' | 'reviewed' | 'failed'
 // =============================================================================
 
-export type GuidelineProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type GuidelineProcessingStatus = 'pending' | 'processing' | 'completed' | 'reviewed' | 'failed';
 
-export type GuidelineDisplayStatus = 'Pending' | 'Processing' | 'Ready' | 'Failed';
+export type GuidelineDisplayStatus = 'Pending' | 'Processing' | 'Ready for Review' | 'Reviewed' | 'Failed';
 
 const PROCESSING_STATUS_MAP: Record<GuidelineProcessingStatus, GuidelineDisplayStatus> = {
   pending:    'Pending',
   processing: 'Processing',
-  completed:  'Ready',
+  completed:  'Ready for Review',
+  reviewed:   'Reviewed',
   failed:     'Failed',
 };
 
@@ -180,6 +181,48 @@ export interface ApiGuideline {
 
 export interface GuidelinesJson {
   guidelines: GuidelineRule[];
+}
+
+/**
+ * The raw shape Bedrock writes to S3 after convert_guidelines.
+ * The prompt outputs { "version": "1.0", "rules": [...] } with a different
+ * rule schema than the frontend uses internally.
+ */
+interface BedrockGuidelinesJson {
+  version: string;
+  rules: BedrockRule[];
+}
+
+interface BedrockRule {
+  id: number;
+  description: string;
+  applies_to: string[];
+  conditions: string[];
+  exceptions: string[];
+}
+
+function bedrockToGuidelinesJson(bedrock: BedrockGuidelinesJson): GuidelinesJson {
+  return {
+    guidelines: bedrock.rules.map(rule => ({
+      id:        String(rule.id),
+      title:     `Rule ${rule.id}`,
+      category:  rule.applies_to.length > 0 ? rule.applies_to.join(', ') : 'General',
+      rule_text: rule.description,
+    })),
+  };
+}
+
+/**
+ * Detect whether a JSON blob from S3 is the raw Bedrock output shape
+ * (has a top-level "rules" array) vs. the saved frontend shape
+ * (has a top-level "guidelines" array). Returns a normalised GuidelinesJson
+ * regardless of which shape it receives.
+ */
+export function normaliseGuidelinesJson(raw: any): GuidelinesJson | null {
+  if (!raw || typeof raw !== 'object') return null;
+  if (Array.isArray(raw.guidelines)) return raw as GuidelinesJson;
+  if (Array.isArray(raw.rules)) return bedrockToGuidelinesJson(raw as BedrockGuidelinesJson);
+  return null;
 }
 
 export interface GuidelineRule {
@@ -541,6 +584,43 @@ export async function deleteGuideline(
 }
 
 
+/**
+ * Fetch the extracted rules for any completed or reviewed guideline.
+ * Handles both the raw Bedrock output shape ({ rules: [...] }) and the saved
+ * frontend shape ({ guidelines: [...] }) transparently via normaliseGuidelinesJson.
+ *
+ * → GET /guidelines/{guideline_id}/rules
+ * ← { success, guideline_id, guidelines_content, processing_status, version, description }
+ *
+ * @param guidelineId  The guideline_id to fetch rules for
+ */
+export async function fetchGuidelineRules(
+  guidelineId: string
+): Promise<ApiResponse<FrontendRule[]>> {
+  const result = await adminRequest<{
+    success: boolean;
+    guideline_id: string;
+    guidelines_content: any;
+    processing_status: string;
+    version: string;
+    description: string;
+  }>(`/guidelines/${encodeURIComponent(guidelineId)}/rules`);
+
+  if (result.error || !result.data) {
+    return { data: null, error: result.error ?? 'Failed to fetch guideline rules' };
+  }
+
+  const { guidelines_content } = result.data;
+
+  const normalised = normaliseGuidelinesJson(guidelines_content);
+  if (!normalised?.guidelines?.length) {
+    return { data: null, error: 'Guidelines JSON is empty or missing a rules/guidelines array' };
+  }
+
+  return { data: extractFrontendRules(normalised), error: null };
+}
+
+
 // =============================================================================
 // UTILITY — RULE SHAPE MAPPING
 // ReviewExtractedRules (frontend) uses camelCase `ruleText`.
@@ -578,10 +658,13 @@ export function toBackendRule(rule: FrontendRule): GuidelineRule {
 
 /**
  * Convert a full GuidelinesJson (backend) to a FrontendRule array for display.
- * Use this after pollGuidelineUntilReady resolves to feed ReviewExtractedRules.
+ * Handles both the raw Bedrock output shape ({ rules: [...] }) and the saved
+ * frontend shape ({ guidelines: [...] }) transparently.
  */
-export function extractFrontendRules(guidelinesJson: GuidelinesJson): FrontendRule[] {
-  return guidelinesJson.guidelines.map(toFrontendRule);
+export function extractFrontendRules(guidelinesJson: any): FrontendRule[] {
+  const normalised = normaliseGuidelinesJson(guidelinesJson);
+  if (!normalised) return [];
+  return normalised.guidelines.map(toFrontendRule);
 }
 
 /**

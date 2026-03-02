@@ -2,23 +2,21 @@
 Convert Guidelines Module
 
 This module handles the conversion of guideline PDFs to structured JSON rules.
-It extracts text from the PDF, sends it to Bedrock for LLM processing, and
-generates a structured JSON document that defines redaction rules.
+It passes the raw PDF bytes directly to Bedrock as a native document block,
+which handles extraction internally. No intermediate text extraction step is needed.
 
 Flow:
 1. Download guidelines PDF from S3
-2. Extract full text from PDF using pdfplumber
-3. Send text to Bedrock with conversion prompt
-4. Parse LLM response to get structured JSON
+2. Pass PDF bytes to Bedrock as a native document content block
+3. Parse LLM response to get structured JSON
+4. Validate JSON structure
 5. Upload JSON to S3
 6. Update DynamoDB status to "completed"
 """
 
 import json
 import logging
-import tempfile
 from typing import Dict, Any
-import pdfplumber
 
 from utils import (
     download_from_s3,
@@ -27,8 +25,7 @@ from utils import (
 )
 from bedrock_config import get_prompt, get_config, get_id
 from constants import (
-    GUIDELINE_PROCESSING_COMPLETED,
-    S3_BUCKET_NAME
+    GUIDELINE_PROCESSING_COMPLETED
 )
 
 logger = logging.getLogger()
@@ -59,20 +56,15 @@ def convert_guidelines(guideline_id: str, s3_paths: Dict[str, str]) -> Dict[str,
         logger.info("Downloading guidelines PDF from S3")
         pdf_bytes = download_from_s3(s3_paths["pdf_path"])
         
-        # Step 2: Extract text from PDF
-        logger.info("Extracting text from guidelines PDF")
-        guidelines_text = extract_guidelines_text(pdf_bytes)
-        logger.info(f"Extracted {len(guidelines_text)} characters from PDF")
+        # Step 2: Convert PDF to JSON using Bedrock (native PDF support)
+        logger.info("Converting guidelines PDF to JSON with Bedrock")
+        guidelines_json = convert_pdf_to_json(pdf_bytes)
         
-        # Step 3: Convert to JSON using Bedrock
-        logger.info("Converting guidelines text to JSON with Bedrock")
-        guidelines_json = convert_text_to_json(guidelines_text)
-        
-        # Step 4: Validate and structure the JSON
+        # Step 3: Validate and structure the JSON
         logger.info("Validating guidelines JSON structure")
         validate_guidelines_json(guidelines_json)
         
-        # Step 5: Upload JSON to S3
+        # Step 4: Upload JSON to S3
         logger.info("Uploading guidelines JSON to S3")
         json_str = json.dumps(guidelines_json, indent=2)
         upload_to_s3(
@@ -80,9 +72,9 @@ def convert_guidelines(guideline_id: str, s3_paths: Dict[str, str]) -> Dict[str,
             data=json_str.encode('utf-8')
         )
         
-        # Step 6: Update DynamoDB status to completed
+        # Step 5: Update DynamoDB status to completed
         metadata = {
-            'total_guidelines': len(guidelines_json.get('guidelines', [])),
+            'total_rules': len(guidelines_json.get('rules', [])),
             'json_path': s3_paths['json_path']
         }
         
@@ -95,7 +87,7 @@ def convert_guidelines(guideline_id: str, s3_paths: Dict[str, str]) -> Dict[str,
         logger.info(f"Successfully converted guidelines for: {guideline_id}")
         
         return {
-            'total_guidelines': len(guidelines_json.get('guidelines', [])),
+            'total_rules': len(guidelines_json.get('rules', [])),
             'json_path': s3_paths['json_path']
         }
         
@@ -104,75 +96,45 @@ def convert_guidelines(guideline_id: str, s3_paths: Dict[str, str]) -> Dict[str,
         raise
 
 
-def extract_guidelines_text(pdf_bytes: bytes) -> str:
+def convert_pdf_to_json(pdf_bytes: bytes) -> Dict[str, Any]:
     """
-    Extract all text from guidelines PDF
+    Convert guidelines PDF to structured JSON using Bedrock's native PDF support.
+    
+    Passes the raw PDF bytes directly as a document content block, bypassing
+    any text extraction step. Bedrock handles the PDF natively.
     
     Args:
         pdf_bytes: Raw PDF file bytes
         
     Returns:
-        Complete text as a single string
-    """
-    
-    logger.info("Extracting text from PDF with pdfplumber")
-    
-    # Write PDF to temporary file for pdfplumber
-    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_pdf:
-        temp_pdf.write(pdf_bytes)
-        temp_pdf_path = temp_pdf.name
-    
-    try:
-        all_text = []
-        with pdfplumber.open(temp_pdf_path) as pdf:
-            total_pages = len(pdf.pages)
-            logger.info(f"Processing {total_pages} pages")
-            
-            for page_num, page in enumerate(pdf.pages, 1):
-                page_text = page.extract_text()
-                if page_text:
-                    all_text.append(f"--- Page {page_num} ---\n{page_text}")
-                else:
-                    logger.warning(f"No text extracted from page {page_num}")
-        
-        full_text = "\n\n".join(all_text)
-        logger.info(f"Extracted {len(full_text)} characters total")
-        return full_text
-        
-    finally:
-        # Clean up temporary file
-        import os
-        os.unlink(temp_pdf_path)
-
-
-def convert_text_to_json(guidelines_text: str) -> Dict[str, Any]:
-    """
-    Convert guidelines text to structured JSON using Bedrock
-    
-    Args:
-        guidelines_text: Full text from guidelines PDF
-        
-    Returns:
         Structured guidelines JSON
     """
     
-    logger.info("Calling Bedrock for guidelines conversion")
+    logger.info(f"Calling Bedrock for guidelines conversion ({len(pdf_bytes)} bytes)")
     
-    # Prepare message with guidelines text
+    # Pass the PDF as a native document block in the user message.
+    # The system prompt carries the conversion instructions.
     message = {
         "role": "user",
         "content": [
             {
-                "text": "Convert the following guidelines document to structured JSON format."
+                "document": {
+                    "format": "pdf",
+                    "name": "guidelines",
+                    "source": {
+                        "bytes": pdf_bytes
+                    }
+                }
+            },
+            {
+                "text": "Convert this guidelines document to structured JSON format."
             }
         ]
     }
     
-    # Get formatted prompt with guidelines text
-    system_prompts = get_prompt(
-        "guidelines_conversion",
-        guidelines_text=guidelines_text
-    )
+    # System prompt carries the conversion instructions only — no document
+    # content injected here, so get_prompt is called without guidelines_text.
+    system_prompts = get_prompt("guidelines_conversion")
     
     # Import here to avoid circular dependency
     from utils import converse_with_bedrock
@@ -185,18 +147,29 @@ def convert_text_to_json(guidelines_text: str) -> Dict[str, Any]:
         inference_config=get_config("guidelines_conversion")
     )
     
+    # Check stop reason before attempting to parse — a max_tokens truncation
+    # would produce invalid JSON with no other indication of failure.
+    stop_reason = response.get("stopReason")
+    if stop_reason == "max_tokens":
+        raise ValueError(
+            "Bedrock response was truncated (max_tokens reached). "
+            "Increase guidelines_conversion_max_tokens in bedrock_config.py."
+        )
+    if stop_reason not in ("end_turn", "stop_sequence"):
+        logger.warning(f"Unexpected stopReason from Bedrock: {stop_reason}")
+    
     # Extract and parse JSON response
     response_text = response["output"]["message"]["content"][0]["text"]
     
     try:
-        # Parse JSON from response (may need to strip markdown code fences)
+        # Strip markdown code fences if the model wrapped the JSON
         response_text = response_text.strip()
         if response_text.startswith("```json"):
-            response_text = response_text[7:]  # Remove ```json
+            response_text = response_text[7:]
         if response_text.startswith("```"):
-            response_text = response_text[3:]  # Remove ```
+            response_text = response_text[3:]
         if response_text.endswith("```"):
-            response_text = response_text[:-3]  # Remove trailing ```
+            response_text = response_text[:-3]
         
         guidelines_json = json.loads(response_text.strip())
         
@@ -211,7 +184,12 @@ def convert_text_to_json(guidelines_text: str) -> Dict[str, Any]:
 
 def validate_guidelines_json(guidelines_json: Dict[str, Any]) -> None:
     """
-    Validate that guidelines JSON has required structure
+    Validate that guidelines JSON matches the expected rules-based structure.
+
+    Checks for the top-level 'rules' array and verifies each rule has all
+    five required fields with correct types. Does not validate the content of
+    applies_to, conditions, or exceptions — that is the guidelines document's
+    domain, not ours.
     
     Args:
         guidelines_json: Guidelines JSON to validate
@@ -222,26 +200,51 @@ def validate_guidelines_json(guidelines_json: Dict[str, Any]) -> None:
     
     logger.info("Validating guidelines JSON structure")
     
-    # Check required top-level fields
-    if 'guidelines' not in guidelines_json:
-        raise ValueError("Missing 'guidelines' array in JSON")
+    # Check top-level structure
+    if 'rules' not in guidelines_json:
+        raise ValueError("Missing 'rules' array in JSON — model may have used old 'guidelines' key")
     
-    if not isinstance(guidelines_json['guidelines'], list):
-        raise ValueError("'guidelines' must be an array")
+    if not isinstance(guidelines_json['rules'], list):
+        raise ValueError("'rules' must be an array")
     
-    # Validate each guideline has required fields
-    for idx, guideline in enumerate(guidelines_json['guidelines']):
-        if not isinstance(guideline, dict):
-            raise ValueError(f"Guideline at index {idx} must be an object")
+    if len(guidelines_json['rules']) == 0:
+        raise ValueError("'rules' array is empty — guidelines document may not have been processed correctly")
+    
+    # All five fields must be present on every rule
+    required_fields = ['id', 'description', 'applies_to', 'conditions', 'exceptions']
+    
+    # Array fields that must be lists (can be empty)
+    array_fields = ['applies_to', 'conditions', 'exceptions']
+    
+    ids_seen = set()
+    
+    for idx, rule in enumerate(guidelines_json['rules']):
+        if not isinstance(rule, dict):
+            raise ValueError(f"Rule at index {idx} must be an object")
         
-        required_fields = ['category', 'description', 'priority']
+        # Check all required fields are present
         for field in required_fields:
-            if field not in guideline:
-                raise ValueError(f"Guideline at index {idx} missing required field: {field}")
+            if field not in rule:
+                raise ValueError(f"Rule at index {idx} missing required field: '{field}'")
         
-        # Validate priority is valid
-        valid_priorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
-        if guideline['priority'] not in valid_priorities:
-            logger.warning(f"Guideline at index {idx} has non-standard priority: {guideline['priority']}")
+        # Validate id is a unique integer
+        if not isinstance(rule['id'], int):
+            raise ValueError(f"Rule at index {idx} has non-integer id: {rule['id']}")
+        if rule['id'] in ids_seen:
+            raise ValueError(f"Duplicate rule id: {rule['id']}")
+        ids_seen.add(rule['id'])
+        
+        # Validate description is a non-empty string
+        if not isinstance(rule['description'], str) or not rule['description'].strip():
+            raise ValueError(f"Rule {rule['id']} has missing or empty description")
+        
+        # Validate array fields are actually arrays
+        for field in array_fields:
+            if not isinstance(rule[field], list):
+                raise ValueError(f"Rule {rule['id']} field '{field}' must be an array (can be empty)")
+        
+        # applies_to must have at least one entry — a rule with no target is meaningless
+        if len(rule['applies_to']) == 0:
+            raise ValueError(f"Rule {rule['id']} has empty 'applies_to' — every rule must target at least one role")
     
-    logger.info(f"Guidelines JSON valid: {len(guidelines_json['guidelines'])} rules")
+    logger.info(f"Guidelines JSON valid: {len(guidelines_json['rules'])} rules")

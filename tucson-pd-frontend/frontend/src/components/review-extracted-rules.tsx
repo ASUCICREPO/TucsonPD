@@ -1,62 +1,43 @@
-import { CheckCircle2, Shield, Eye, FileText, ChevronDown, ChevronUp, ArrowLeft, Edit2, Save, X } from 'lucide-react';
+import { CheckCircle2, Shield, FileText, ArrowLeft, Edit2, Save, X, Loader2, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { PDFPageViewer } from './pdf-page-viewer';
-
-interface ExtractedRule {
-  id: string;
-  title: string;
-  category: string;
-  ruleText: string;
-}
+import {
+  updateGuidelineRules,
+  buildGuidelinesJson,
+  type FrontendRule,
+} from './adminapimanager';
 
 interface ReviewExtractedRulesProps {
+  guidelineId: string;
   fileName: string;
-  extractedRules: ExtractedRule[];
-  onSaveGuideline: (rules: ExtractedRule[]) => void;
+  extractedRules: FrontendRule[];
+  onSaveGuideline: (guidelineId: string) => void;
   onBackToUpload: () => void;
   fileUrl?: string | null;
 }
 
-export function ReviewExtractedRules({ 
-  fileName, 
+export function ReviewExtractedRules({
+  guidelineId,
+  fileName,
   extractedRules: initialRules,
   onSaveGuideline,
   onBackToUpload,
   fileUrl
 }: ReviewExtractedRulesProps) {
-  const [rules, setRules] = useState<ExtractedRule[]>(initialRules);
+  const [rules, setRules] = useState<FrontendRule[]>(initialRules);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
-  
-  // State for collapsible sections
-  const [expandedCategories, setExpandedCategories] = useState<{ [key: string]: boolean }>({
-    'PII': true,
-    'Addresses': true,
-    'Names': true,
-    'Sensitive Info': true,
-  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Group rules by category
-  const rulesByCategory = rules.reduce((acc, rule) => {
-    if (!acc[rule.category]) {
-      acc[rule.category] = [];
-    }
-    acc[rule.category].push(rule);
-    return acc;
-  }, {} as { [key: string]: ExtractedRule[] });
-
-  const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
-  };
-
-  const handleEditRule = (rule: ExtractedRule) => {
+  const handleEditRule = (rule: FrontendRule) => {
     setEditingRuleId(rule.id);
     setEditingText(rule.ruleText);
   };
 
   const handleSaveEdit = (ruleId: string) => {
-    setRules(prev => prev.map(rule => 
+    setRules(prev => prev.map(rule =>
       rule.id === ruleId ? { ...rule, ruleText: editingText } : rule
     ));
     setEditingRuleId(null);
@@ -68,10 +49,25 @@ export function ReviewExtractedRules({
     setEditingText('');
   };
 
-  const handleSaveGuideline = () => {
-    if (isConfirmed) {
-      onSaveGuideline(rules);
+  const handleSaveGuideline = async () => {
+    if (!isConfirmed || isSaving) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    const { error } = await updateGuidelineRules(
+      guidelineId,
+      buildGuidelinesJson(rules)
+    );
+
+    setIsSaving(false);
+
+    if (error) {
+      setSaveError(`Failed to save guideline: ${error}`);
+      return;
     }
+
+    onSaveGuideline(guidelineId);
   };
 
   return (
@@ -132,88 +128,59 @@ export function ReviewExtractedRules({
               <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 max-h-[700px] overflow-y-auto">
                 <h4 className="text-slate-900 mb-4">Extracted Rules & Guidelines</h4>
                 
-                <div className="space-y-4">
-                  {Object.entries(rulesByCategory).map(([category, categoryRules]) => (
-                    <div key={category} className="border border-slate-200 rounded-lg overflow-hidden">
-                      {/* Collapsible Category Header */}
-                      <button
-                        onClick={() => toggleCategory(category)}
-                        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Shield className="w-5 h-5 text-blue-600" />
-                          <div className="text-left">
-                            <p className="text-slate-900">{category}</p>
-                            <p className="text-slate-600">
-                              {categoryRules.length} {categoryRules.length === 1 ? 'rule' : 'rules'}
-                            </p>
+                <div className="space-y-3">
+                  {rules.map((rule, index) => (
+                    <div
+                      key={rule.id}
+                      className="p-4 rounded-lg border-2 border-slate-200 bg-slate-50"
+                    >
+                      {/* Rule header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                          <Shield className="w-3 h-3" />
+                          Rule {index + 1}
+                        </div>
+                        {editingRuleId !== rule.id && (
+                          <button
+                            onClick={() => handleEditRule(rule)}
+                            className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Edit rule"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Rule text — editable */}
+                      {editingRuleId === rule.id ? (
+                        <div className="space-y-3">
+                          <textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            className="w-full p-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 min-h-[100px]"
+                            autoFocus
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={handleCancelEdit}
+                              className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors flex items-center gap-2"
+                            >
+                              <X className="w-4 h-4" />
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSaveEdit(rule.id)}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                            >
+                              <Save className="w-4 h-4" />
+                              Save Changes
+                            </button>
                           </div>
                         </div>
-                        {expandedCategories[category] ? (
-                          <ChevronUp className="w-5 h-5 text-slate-600" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5 text-slate-600" />
-                        )}
-                      </button>
-
-                      {/* Collapsible Category Content */}
-                      {expandedCategories[category] && (
-                        <div className="p-4 space-y-4 bg-white">
-                          {categoryRules.map((rule) => (
-                            <div
-                              key={rule.id}
-                              className="p-4 rounded-lg border-2 border-slate-200 bg-slate-50"
-                            >
-                              {/* Rule Title */}
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-                                  {rule.title}
-                                </div>
-                                {editingRuleId !== rule.id && (
-                                  <button
-                                    onClick={() => handleEditRule(rule)}
-                                    className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                    title="Edit rule"
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
-
-                              {/* Rule Text - Editable */}
-                              {editingRuleId === rule.id ? (
-                                <div className="space-y-3">
-                                  <textarea
-                                    value={editingText}
-                                    onChange={(e) => setEditingText(e.target.value)}
-                                    className="w-full p-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 min-h-[100px]"
-                                    autoFocus
-                                  />
-                                  <div className="flex gap-2 justify-end">
-                                    <button
-                                      onClick={handleCancelEdit}
-                                      className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors flex items-center gap-2"
-                                    >
-                                      <X className="w-4 h-4" />
-                                      Cancel
-                                    </button>
-                                    <button
-                                      onClick={() => handleSaveEdit(rule.id)}
-                                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                                    >
-                                      <Save className="w-4 h-4" />
-                                      Save Changes
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <p className="text-slate-700 bg-white p-3 rounded border border-slate-200">
-                                  {rule.ruleText}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                      ) : (
+                        <p className="text-slate-700 bg-white p-3 rounded border border-slate-200 leading-relaxed">
+                          {rule.ruleText}
+                        </p>
                       )}
                     </div>
                   ))}
@@ -236,21 +203,32 @@ export function ReviewExtractedRules({
                   </span>
                 </label>
 
+                {/* Save Error */}
+                {saveError && (
+                  <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-700">{saveError}</p>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     onClick={onBackToUpload}
-                    className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors flex items-center justify-center gap-2"
+                    disabled={isSaving}
+                    className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ArrowLeft className="w-5 h-5" />
-                    Back to Upload
+                    Back to Dashboard
                   </button>
                   <button
                     onClick={handleSaveGuideline}
-                    disabled={!isConfirmed}
+                    disabled={!isConfirmed || isSaving}
                     className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                   >
-                    <CheckCircle2 className="w-5 h-5" />
-                    Save Guideline
+                    {isSaving
+                      ? <><Loader2 className="w-5 h-5 animate-spin" /> Saving…</>
+                      : <><CheckCircle2 className="w-5 h-5" /> Save Guideline</>
+                    }
                   </button>
                 </div>
               </div>

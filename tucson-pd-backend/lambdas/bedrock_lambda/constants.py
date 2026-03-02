@@ -96,7 +96,7 @@ GUIDELINE_PROCESSING_FAILED = "failed"          # Conversion failed
 # ============================================================================
 
 # Default Bedrock model ID (can be overridden by environment variable)
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "us.meta.llama3-3-70b-instruct-v1:0")
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0")
 
 
 # ============================================================================
