@@ -384,6 +384,16 @@ function AppInner() {
       CLOSED:              'complete',
       FAILED:              'upload',
     };
+
+    // If the status is still REVIEWING but edited_redactions has already been
+    // written to S3, the officer submitted their review and the backend just
+    // hasn't transitioned to APPLYING_REDACTIONS yet (race condition on re-entry).
+    // Force the stage to 'processing' so we don't loop back to the review screen.
+    const hasSubmittedRedactions = !!apiCase.s3_paths?.edited_redactions;
+    const effectiveStage = (apiCase.status === 'REVIEWING' && hasSubmittedRedactions)
+      ? 'processing'
+      : (statusMap[apiCase.status] ?? 'upload');
+
     return {
       id:              apiCase.case_id,
       caseId:          apiCase.case_id,
@@ -392,9 +402,10 @@ function AppInner() {
       dateCreated:     new Date(apiCase.created_at * 1000).toLocaleDateString('en-US', {
                          month: 'short', day: 'numeric', year: 'numeric'
                        }),
-      redactionStage:  statusMap[apiCase.status] ?? 'upload',
+      redactionStage:  effectiveStage,
       fileName:        apiCase.s3_paths?.unredacted_doc?.split('/').pop() ?? undefined,
       isMarkedComplete: apiCase.status === 'COMPLETED' || apiCase.status === 'CLOSED',
+      updatedAt:       apiCase.updated_at ?? null,   // Unix seconds — used for elapsed timer
       intakeFormData:  apiCase.s3_paths?.intake_form
                          ? { fileName: 'Intake Form', s3Key: apiCase.s3_paths.intake_form }
                          : null,

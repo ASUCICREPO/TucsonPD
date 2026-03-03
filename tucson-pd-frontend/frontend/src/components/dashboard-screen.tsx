@@ -48,7 +48,9 @@ function mapApiCase(c: ApiCase): CaseData {
     isMarkedComplete: c.status === 'COMPLETED' || c.status === 'CLOSED',
     fileName: c.s3_paths?.unredacted_doc?.split('/').pop(),
     s3OriginalKey: c.s3_paths?.unredacted_doc ?? undefined,
-    s3RedactedKey: c.s3_paths?.redacted_doc ?? undefined,
+    s3RedactedKey: c.s3_paths?.redacted_doc
+      ?? (c.metadata as any)?.redacted_doc_path
+      ?? (c.status === 'COMPLETED' || c.status === 'CLOSED' ? 'completed' : undefined),
     isProcessing: c.status === 'PROCESSING' || c.status === 'APPLYING_REDACTIONS',
     redactedBy: c.officer_name,
     redactedByEmail: c.officer_id,
@@ -296,14 +298,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
       toast.error('Could not retrieve redacted document', { description: error ?? 'Unknown error' });
       return;
     }
-    const link = document.createElement('a');
-    link.href = data;
-    link.download = caseData.fileName
-      ? caseData.fileName.replace('_Unredacted', '_Redacted')
-      : 'redacted_document.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.open(data, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownloadUnredactedDocument = async (caseData: CaseData) => {
@@ -315,18 +310,13 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
       toast.error('Could not retrieve original document', { description: error ?? 'Unknown error' });
       return;
     }
-    const link = document.createElement('a');
-    link.href = data;
-    link.download = caseData.fileName ?? 'original_document.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.open(data, '_blank', 'noopener,noreferrer');
   };
 
   // Filter the active tab's cases by search query, status, and officer
   let filteredCases = cases.filter(c => {
-    const matchesSearch = c.caseId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.requesterName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (c.caseId ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.requesterName ?? '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.redactionStatus === statusFilter;
     const matchesRedactedBy = activeTab === 'my' || redactedByFilter === 'all' || c.redactedByEmail === redactedByFilter;
     return matchesSearch && matchesStatus && matchesRedactedBy;
@@ -827,7 +817,7 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
                               )}
                             </td>
                             <td className="px-6 py-4">
-                              {caseData.isMarkedComplete && caseData.s3RedactedKey ? (
+                              {caseData.s3RedactedKey ? (
                                 <button
                                   onClick={() => handleDownloadRedactedDocument(caseData)}
                                   className="text-blue-600 hover:text-blue-800 hover:underline transition-colors flex items-center gap-1"
@@ -835,6 +825,8 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
                                   Redacted PDF
                                   <Download className="w-4 h-4" />
                                 </button>
+                              ) : caseData.isProcessing ? (
+                                <span className="text-slate-400">Processing...</span>
                               ) : (
                                 <span className="text-slate-400">Not available</span>
                               )}

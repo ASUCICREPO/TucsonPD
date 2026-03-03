@@ -19,7 +19,10 @@ Flow:
 
 import json
 import logging
+import os
+import time
 from typing import Dict, Any, List
+import boto3
 import fitz  # PyMuPDF
 
 from utils import (
@@ -31,6 +34,9 @@ from constants import STATUS_APPLYING_REDACTIONS, STATUS_COMPLETED
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+_dynamodb = boto3.resource('dynamodb')
+_cases_table = _dynamodb.Table(os.environ['DYNAMODB_TABLE_NAME'])
 
 # Small safety expansion applied to every redaction box in PDF points.
 # Nova's boxes are already slightly padded per prompt instructions, but this
@@ -93,7 +99,18 @@ def apply_redactions(case_id: str, s3_paths: Dict[str, str]) -> Dict[str, Any]:
             data=redacted_pdf_bytes
         )
 
-        # Step 5: Update DynamoDB status to COMPLETED
+        # Step 5: Record the redacted doc path in s3_paths so the frontend can find it
+        logger.info("Recording redacted_doc path in s3_paths")
+        _cases_table.update_item(
+            Key={'case_id': case_id},
+            UpdateExpression='SET s3_paths.redacted_doc = :path, updated_at = :ts',
+            ExpressionAttributeValues={
+                ':path': s3_paths["redacted_doc"],
+                ':ts': int(time.time()),
+            }
+        )
+
+        # Step 6: Update DynamoDB status to COMPLETED
         update_dynamodb_status(
             case_id=case_id,
             status=STATUS_COMPLETED,

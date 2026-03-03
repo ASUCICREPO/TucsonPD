@@ -107,7 +107,7 @@ def generate_download_url(
     logger.info(f"Generating download URL for case {case_id}, file type: {file_type}")
     
     # Validate file_type
-    valid_download_types = ['redaction_proposals', 'redacted_doc', 'unredacted_doc', 'intake_form']
+    valid_download_types = ['redaction_proposals', 'redacted_doc', 'unredacted_doc', 'intake_form', 'edited_redactions']
     if file_type not in valid_download_types:
         raise ValueError(f"Invalid file_type for download: {file_type}. Must be one of {valid_download_types}")
     

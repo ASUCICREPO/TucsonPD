@@ -13,6 +13,9 @@ import {
   updateCaseS3Path,
   updateCaseStatus,
   getCaseById,
+  getDownloadPresignedUrl,
+  submitEditedRedactions,
+  type RedactionProposalsJson,
 } from './apigatewaymanager';
 
 interface CaseDetailScreenProps {
@@ -22,6 +25,7 @@ interface CaseDetailScreenProps {
     requesterName: string;
     redactionStatus: 'Not Started' | 'In Progress' | 'Needs Review' | 'Completed';
     dateCreated: string;
+    updatedAt?: number | null;  // Unix seconds — when the current status was set
     // Redaction state
     redactionStage?: RedactionStage;
     fileName?: string;
@@ -44,16 +48,6 @@ interface CaseDetailScreenProps {
 
 type RedactionStage = 'upload' | 'analyzing' | 'rules-review' | 'processing' | 'complete';
 
-interface RedactionRule {
-  category: string;
-  matchCount: number;
-  matches: {
-    page: number;
-    location: string;
-    text: string;
-  }[];
-}
-
 export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdateCase, onAddCase, isNewCase }: CaseDetailScreenProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -65,6 +59,7 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
   const [isMarkedComplete, setIsMarkedComplete] = useState(false);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const reviewingStatusSetRef = useRef(false);
 
   function clearFile() {
     if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
@@ -109,56 +104,23 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
       setRequesterName(caseData.intakeFormData.requesterName);
       setRedactionCategory(caseData.intakeFormData.redactionCategory);
     }
-  }, [caseData, isNewCase]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally run once on mount only
 
-  // Mock redaction rules data
-  const redactionRules: RedactionRule[] = [
-    {
-      category: 'Redact PII: Names',
-      matchCount: 14,
-      matches: [
-        { page: 1, location: 'Line 4', text: 'Detective Sarah Martinez' },
-        { page: 1, location: 'Paragraph 2', text: 'John Anderson' },
-        { page: 2, location: 'Line 1', text: 'Michael Roberts' },
-        { page: 2, location: 'Paragraph 1', text: 'Officer James Wilson' }
-      ]
-    },
-    {
-      category: 'Redact Phone Numbers',
-      matchCount: 3,
-      matches: [
-        { page: 1, location: 'Contact Info', text: '(555) 123-4567' },
-        { page: 2, location: 'Emergency Contact', text: '(555) 987-6543' },
-        { page: 3, location: 'Witness Contact', text: '555-111-2222' }
-      ]
-    },
-    {
-      category: 'Redact Addresses',
-      matchCount: 5,
-      matches: [
-        { page: 2, location: 'Paragraph 1', text: '123 W. Grant Road, Apt 4B' },
-        { page: 2, location: 'Line 8', text: '456 Oak Street' },
-        { page: 3, location: 'Residence Info', text: '789 Pine Avenue, Unit 12' }
-      ]
-    },
-    {
-      category: 'Redact Sensitive Identifiers',
-      matchCount: 8,
-      matches: [
-        { page: 2, location: 'Personal Info', text: 'DOB: 07/22/1985' },
-        { page: 2, location: 'ID Section', text: 'SSN: XXX-XX-1234' },
-        { page: 3, location: 'Driver License', text: 'DL# A1234567' }
-      ]
-    }
-  ];
-
+  // redactionStats derived from real case metadata after completion
   const redactionStats = {
-    namesRedacted: 14,
-    addressesRedacted: 5,
-    phoneNumbersRedacted: 3,
-    identifiersRedacted: 8,
-    totalRedactions: 30
+    totalRedactions: (caseData as any).metadata?.total_redactions_applied ?? 0,
   };
+
+  // If we land directly into rules-review (e.g. reopening a REVIEW_READY case),
+  // mark it REVIEWING so the backend knows it is being actively worked on.
+  // The ref guard ensures this only fires once per mount, not on every stage change
+  // back to rules-review, which would overwrite the backend status and cause looping.
+  useEffect(() => {
+    if (redactionStage === 'rules-review' && !isNewCase && !reviewingStatusSetRef.current) {
+      reviewingStatusSetRef.current = true;
+      updateCaseStatus(caseData.id, 'REVIEWING').catch(console.error);
+    }
+  }, [redactionStage]);
 
   // Poll backend status while in the analyzing stage
   useEffect(() => {
@@ -170,6 +132,10 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
 
       if (data.status === 'REVIEW_READY' || data.status === 'REVIEWING') {
         clearInterval(interval);
+        // Mark REVIEWING so the backend knows an officer has opened the proposals
+        if (data.status === 'REVIEW_READY') {
+          await updateCaseStatus(caseData.id, 'REVIEWING');
+        }
         setRedactionStage('rules-review');
       } else if (data.status === 'FAILED') {
         clearInterval(interval);
@@ -184,31 +150,34 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
     return () => clearInterval(interval);
   }, [redactionStage, caseData.id]);
 
-  // Simulate redaction processing
+  // Poll backend while applying redactions — mirrors the analyzing poller
   useEffect(() => {
-    if (redactionStage === 'processing') {
-      setProcessingProgress(0);
-      const interval = setInterval(() => {
-        setProcessingProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setTimeout(() => {
-              setRedactionStage('complete');
-              // Save state when transitioning to complete
-              onUpdateCase({
-                ...caseData,
-                redactionStage: 'complete' as const
-              });
-            }, 500);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 300);
+    if (redactionStage !== 'processing') return;
 
-      return () => clearInterval(interval);
-    }
-  }, [redactionStage]);
+    setProcessingProgress(0);
+    const interval = setInterval(async () => {
+      const { data } = await getCaseById(caseData.id);
+      if (!data) return;
+
+      if (data.status === 'COMPLETED' || data.status === 'CLOSED') {
+        clearInterval(interval);
+        setProcessingProgress(100);
+        setTimeout(() => {
+          setRedactionStage('complete');
+          onUpdateCase({ ...caseData, redactionStage: 'complete' as const });
+        }, 500);
+      } else if (data.status === 'FAILED') {
+        clearInterval(interval);
+        toast.error('Redaction failed', { description: 'Please review the proposals and try again.' });
+        setRedactionStage('rules-review');
+        setIsConfirmed(false);
+      }
+      // Slow visual tick so the loader doesn't look frozen
+      setProcessingProgress(prev => Math.min(prev + 5, 90));
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [redactionStage, caseData.id]);
 
   // Create preview URL when file is selected
   useEffect(() => {
@@ -337,18 +306,25 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
     }
   };
 
-  const handleApproveRules = () => {
-    if (!isConfirmed) {
-      alert('Please confirm that you have reviewed and approved the redaction rules.');
-      return;
+  const handleApproveRules = async (editedJson: RedactionProposalsJson) => {
+    try {
+      toast.loading('Submitting redactions...', { id: 'approve' });
+      const { error } = await submitEditedRedactions(caseData.id, editedJson, (pct) => {
+        if (pct < 100) toast.loading(`Submitting... ${pct}%`, { id: 'approve' });
+      });
+      if (error) {
+        toast.error('Failed to submit redactions', { id: 'approve', description: error });
+        return;
+      }
+      toast.success('Redactions submitted — applying now', { id: 'approve' });
+      setIsConfirmed(false);
+      setProcessingProgress(0);
+      onUpdateCase({ ...caseData, redactionStage: 'processing' as const, isConfirmed: false });
+      setRedactionStage('processing');
+    } catch (err) {
+      toast.error('Unexpected error submitting redactions', { id: 'approve' });
+      console.error(err);
     }
-    // Save state when moving to processing
-    onUpdateCase({
-      ...caseData,
-      redactionStage: 'processing' as const,
-      isConfirmed: true
-    });
-    setRedactionStage('processing');
   };
 
   const handleRetryRedaction = () => {
@@ -361,18 +337,26 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
     setIsConfirmed(false);
   };
 
-  const handleDownload = () => {
-    alert('Downloading redacted document...');
+  const handleDownload = async () => {
+    toast.loading('Preparing download...', { id: 'download' });
+    const { data: url, error } = await getDownloadPresignedUrl(caseData.id, 'redacted_doc');
+    if (error || !url) {
+      toast.error('Download failed', { id: 'download', description: error ?? 'Unknown error' });
+      return;
+    }
+    toast.dismiss('download');
+    // Open in new tab — browser will trigger the file download
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleMarkComplete = () => {
+  const handleMarkComplete = async () => {
+    const { error } = await updateCaseStatus(caseData.id, 'COMPLETED');
+    if (error) {
+      toast.error('Failed to mark case complete', { description: error });
+      return;
+    }
     setIsMarkedComplete(true);
-    
-    // Update the case status to Completed (don't add a new case since it already exists)
-    onUpdateCase({
-      ...caseData,
-      redactionStatus: 'Completed'
-    });
+    onUpdateCase({ ...caseData, redactionStatus: 'Completed' });
   };
 
   const handleGoToDashboard = () => {
@@ -557,6 +541,7 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
                 progress={analysisProgress}
                 fileName={selectedFile?.name || ''}
                 caseId=""
+                startedAt={caseData.updatedAt ?? undefined}
                 steps={[
                   { threshold: 40, label: 'Scanning document structure...' },
                   { threshold: 70, label: 'Identifying sensitive information...' },
@@ -566,13 +551,10 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
             ) : redactionStage === 'rules-review' ? (
               // Stage 3: Review Redaction Rules
               <RedactionRulesInline
-                fileName={selectedFile?.name || ''}
-                classificationLevel="Standard"
-                redactionRules={redactionRules}
+                caseId={caseData.id}
                 isConfirmed={isConfirmed}
                 onConfirmChange={setIsConfirmed}
                 onApprove={handleApproveRules}
-                onBackToUpload={handleBackToUpload}
               />
             ) : redactionStage === 'processing' ? (
               // Stage 4: Processing Redaction (Loader)
@@ -582,6 +564,7 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
                 progress={processingProgress}
                 fileName={selectedFile?.name || ''}
                 caseId={caseData.caseId}
+                startedAt={caseData.updatedAt ?? undefined}
                 steps={[
                   { threshold: 30, label: 'Analyzing document structure...' },
                   { threshold: 60, label: 'Applying redaction rules...' },
@@ -591,15 +574,14 @@ export function CaseDetailScreen({ caseData, onBack, onBackToIntakeForm, onUpdat
             ) : (
               // Stage 5: Redaction Complete
               <RedactionCompleteInline
+                caseId={caseData.id}
                 fileName={selectedFile?.name || ''}
                 classificationLevel="Standard"
                 redactionStats={redactionStats}
                 isMarkedComplete={isMarkedComplete}
                 onDownload={handleDownload}
-                onRetry={handleRetryRedaction}
                 onComplete={handleMarkComplete}
                 onGoToDashboard={handleGoToDashboard}
-                onBackToUpload={handleBackToUpload}
               />
             )}
           </div>

@@ -77,6 +77,14 @@ export interface CaseMetadata {
   total_pages: number | null;
   total_redactions_proposed: number | null;
   total_redactions_applied: number | null;
+  /** Path written by the Lambda — may be here instead of s3_paths.redacted_doc */
+  redacted_doc_path?: string | null;
+  redaction_proposals_path?: string | null;
+  document_summary?: string | null;
+  guideline_id?: string | null;
+  guideline_version?: string | null;
+  total_redactions_skipped?: number | null;
+  stage?: string | null;
 }
 
 /** Error tracking block on the case record */
@@ -136,6 +144,36 @@ export interface GuidelineRule {
   title: string;
   category: string;
   rule_text: string;
+}
+
+/** Bounding box coordinates for a redaction region on a PDF page */
+export interface RedactionBBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * A single proposed redaction item as written by the Bedrock Lambda.
+ * `approved` is a frontend-only field added during officer review — never
+ * present in the original S3 JSON, stripped before re-upload.
+ */
+export interface RedactionItem {
+  page: number;
+  text: string;
+  instance: number;
+  rules: string[];           // Rule IDs referencing GuidelineRule.id
+  bbox_nova: RedactionBBox;  // Coordinates in Nova's coordinate space
+  bbox_pts: RedactionBBox;   // Coordinates in PDF point space
+  approved?: boolean;        // Frontend-only: set during review, stripped on submit
+}
+
+/** Top-level shape of the redaction_proposals JSON stored in S3 */
+export interface RedactionProposalsJson {
+  case_id: string;
+  total_pages: number;
+  redactions: RedactionItem[];
 }
 
 /** Response shape from POST /presigned-url/upload */
@@ -461,7 +499,7 @@ export async function getUploadPresignedUrl(
  */
 export async function getDownloadPresignedUrl(
   caseId: string,
-  fileType: 'intake_form' | 'unredacted_doc' | 'redaction_proposals' | 'redacted_doc'
+  fileType: 'intake_form' | 'unredacted_doc' | 'redaction_proposals' | 'edited_redactions' | 'redacted_doc'
 ): Promise<ApiResponse<string>> {
   const result = await request<{ success: boolean; download_url: string }>(
     '/presigned-url/download',
@@ -474,6 +512,111 @@ export async function getDownloadPresignedUrl(
     data: result.data?.download_url ?? null,
     error: result.error,
   };
+}
+
+
+// =============================================================================
+// REDACTION PROPOSALS
+// =============================================================================
+
+/**
+ * Fetch the redaction proposals JSON for a case directly from S3.
+ * Gets a presigned download URL from the backend, then fetches the JSON from S3.
+ * Case should be in REVIEW_READY or REVIEWING status before calling.
+ *
+ * → internally: POST /presigned-url/download → GET {presigned_s3_url}
+ * ← parsed RedactionProposalsJson
+ */
+export async function getRedactionProposals(
+  caseId: string
+): Promise<ApiResponse<RedactionProposalsJson>> {
+  const urlResult = await getDownloadPresignedUrl(caseId, 'redaction_proposals');
+  if (!urlResult.data) return { data: null, error: urlResult.error };
+
+  try {
+    const res = await fetch(urlResult.data);
+    if (!res.ok) return { data: null, error: `S3 fetch failed: HTTP ${res.status}` };
+    const json: RedactionProposalsJson = await res.json();
+    return { data: json, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { data: null, error: message };
+  }
+}
+
+/**
+ * Fetch the final edited redactions JSON for a completed case directly from S3.
+ * Same structure as redaction proposals — use after status reaches COMPLETED.
+ *
+ * → internally: POST /presigned-url/download → GET {presigned_s3_url}
+ * ← parsed RedactionProposalsJson
+ */
+export async function getEditedRedactions(
+  caseId: string
+): Promise<ApiResponse<RedactionProposalsJson>> {
+  const urlResult = await getDownloadPresignedUrl(caseId, 'edited_redactions');
+  if (!urlResult.data) return { data: null, error: urlResult.error };
+
+  try {
+    const res = await fetch(urlResult.data);
+    if (!res.ok) return { data: null, error: `S3 fetch failed: HTTP ${res.status}` };
+    const json: RedactionProposalsJson = await res.json();
+    return { data: json, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return { data: null, error: message };
+  }
+}
+
+/**
+ * Upload the officer-edited redactions JSON back to S3, record the S3 path on
+ * the case, then transition to APPLYING_REDACTIONS to trigger the Bedrock Lambda.
+ *
+ * The `approved` field on each RedactionItem is stripped before upload — it is
+ * a frontend-only review flag and must not be persisted to S3.
+ *
+ * Flow:
+ *   1. Strip frontend-only fields and serialize to a File Blob
+ *   2. POST /presigned-url/upload → get presigned S3 POST URL
+ *   3. Upload Blob to S3 via uploadFileToS3()
+ *   4. PUT /cases/{case_id}/s3-path to record edited_redactions path
+ *   5. PUT /cases/{case_id}/status → APPLYING_REDACTIONS (triggers Bedrock Lambda)
+ *
+ * ← updated ApiCase after status transition
+ */
+export async function submitEditedRedactions(
+  caseId: string,
+  redactionsJson: RedactionProposalsJson,
+  onProgress?: (percent: number) => void
+): Promise<ApiResponse<ApiCase>> {
+  // Step 1: Strip frontend-only `approved` flag before persisting
+  const cleanedJson: RedactionProposalsJson = {
+    ...redactionsJson,
+    redactions: redactionsJson.redactions.map(({ approved: _dropped, ...rest }) => rest),
+  };
+
+  const blob = new Blob([JSON.stringify(cleanedJson, null, 2)], { type: 'application/json' });
+  const file = new File([blob], `edited_redactions_${caseId}.json`, { type: 'application/json' });
+
+  // Step 2: Get presigned upload URL
+  const urlResult = await getUploadPresignedUrl(caseId, 'edited_redactions');
+  if (!urlResult.data) return { data: null, error: urlResult.error };
+
+  // Step 3: Upload to S3
+  const uploadResult = await uploadFileToS3(
+    urlResult.data.upload_url,
+    urlResult.data.fields,
+    file,
+    onProgress
+  );
+  if (uploadResult.error) return { data: null, error: uploadResult.error };
+
+  // Step 4: Record S3 path on the case
+  const pathResult = await updateCaseS3Path(caseId, 'edited_redactions', urlResult.data.s3_path);
+  if (!pathResult.data) return { data: null, error: pathResult.error };
+
+  // Step 5: Transition status → triggers Bedrock Lambda to apply redactions
+  return updateCaseStatus(caseId, 'APPLYING_REDACTIONS');
 }
 
 
@@ -575,7 +718,7 @@ export async function getAllGuidelines(): Promise<ApiResponse<{
  */
 export async function getActiveGuideline(): Promise<ApiResponse<ApiGuideline>> {
   const result = await request<{ success: boolean; guideline: ApiGuideline }>(
-    '/guidelines/active'
+    `/guidelines/active?officer_id=${encodeURIComponent(_identity.officer_id)}`
   );
   return { data: result.data?.guideline ?? null, error: result.error };
 }
