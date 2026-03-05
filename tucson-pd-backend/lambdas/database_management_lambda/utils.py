@@ -10,6 +10,7 @@ import logging
 import uuid
 import time
 import boto3
+from botocore.config import Config
 from typing import Dict, Any, List, Optional, Tuple
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key
@@ -36,7 +37,16 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 # Initialize AWS clients once at module load
-s3_client = boto3.client('s3', region_name=AWS_REGION)
+# S3 client must use the regional endpoint (not the global s3.amazonaws.com) and
+# SigV4 signing — otherwise presigned POST/PUT URLs point to the global endpoint,
+# which causes a 500 on CORS OPTIONS preflight because the signature is bound to
+# the regional endpoint but the request hits a different one.
+s3_client = boto3.client(
+    's3',
+    region_name=AWS_REGION,
+    endpoint_url=f'https://s3.{AWS_REGION}.amazonaws.com',
+    config=Config(signature_version='s3v4')
+)
 dynamodb_resource = boto3.resource('dynamodb', region_name=AWS_REGION)
 lambda_client = boto3.client('lambda', region_name=AWS_REGION)
 

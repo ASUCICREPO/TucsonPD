@@ -2,7 +2,8 @@
 Constants and Configuration for Bedrock Processing Lambda
 
 This module contains all environment variables, constants, and logging configuration
-for the redaction processing system.
+for the redaction processing system. Includes OCR extraction settings for the
+split OCR + semantic analysis architecture.
 """
 
 import os
@@ -111,6 +112,21 @@ OPERATION_TIMEOUT = 300  # 5 minutes
 
 # Lambda function timeout should be set to OPERATION_TIMEOUT + buffer
 LAMBDA_TIMEOUT = 360  # 6 minutes recommended
+
+
+# ============================================================================
+# OCR CONFIGURATION
+# ============================================================================
+
+# DPI for OCR text extraction. Must match PAGE_RENDER_DPI in process_document.py.
+# 150 is sufficient for clean printed scans; increase to 200 for degraded scans.
+OCR_RENDER_DPI = 150
+
+# Minimum OCR confidence (0-100) to include a word in the text map.
+# Words below this threshold are excluded as likely noise.
+# Set conservatively low — better to include a questionable word and let
+# Nova decide than to silently drop redactable text.
+OCR_MIN_CONFIDENCE = 30.0
 
 
 logger = logging.getLogger(__name__)

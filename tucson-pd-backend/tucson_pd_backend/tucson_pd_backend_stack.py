@@ -119,6 +119,18 @@ class TucsonPdBackendStack(Stack):
         )
 
         # ======================================================================
+        # LAMBDA LAYER - TESSERACT OCR
+        # ======================================================================
+
+        tesseract_ocr_layer = _lambda.LayerVersion(
+            self,
+            'TesseractOcrLayer',
+            code=_lambda.Code.from_asset('./lambdas/layers/tesseract-ocr-layer.zip'),
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            description='Tesseract OCR binary and English language data for text extraction',
+        )
+
+        # ======================================================================
         # LAMBDA FUNCTION - BEDROCK PROCESSING
         # ======================================================================
 
@@ -130,12 +142,16 @@ class TucsonPdBackendStack(Stack):
             code=_lambda.Code.from_asset('./lambdas/bedrock_lambda'),
             timeout=Duration.seconds(900),  # 15 minutes
             memory_size=1024,
-            layers=[pdf_processing_layer],
+            layers=[pdf_processing_layer, tesseract_ocr_layer],
             environment={
                 'S3_BUCKET_NAME': redaction_bucket.bucket_name,
                 'DYNAMODB_TABLE_NAME': cases_table.table_name,
                 'DYNAMODB_GUIDELINES_TABLE_NAME': guidelines_table.table_name,
                 'BEDROCK_MODEL_ID': BEDROCK_MODEL_ID,
+                # Tesseract OCR paths — layer unpacks to /opt/
+                'PATH': '/opt/bin:/var/lang/bin:/usr/local/bin:/usr/bin:/bin',
+                'LD_LIBRARY_PATH': '/opt/lib:/var/lang/lib:/lib64:/usr/lib64',
+                'TESSDATA_PREFIX': '/opt/share/tessdata',
             },
             description='Bedrock Lambda for PDF redaction processing'
         )

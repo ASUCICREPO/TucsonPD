@@ -310,12 +310,25 @@ export function uploadFileToS3(
         onProgress?.(100);
         resolve({ data: null, error: null });
       } else {
-        resolve({ data: null, error: `S3 upload failed: HTTP ${xhr.status}` });
+        // DEBUG: log full S3 error XML to console so we can diagnose the rejection
+        console.error('[uploadFileToS3] S3 upload failed (onload)');
+        console.error('  Status:', xhr.status);
+        console.error('  Response body (S3 error XML):', xhr.responseText);
+        console.error('  All response headers:', xhr.getAllResponseHeaders());
+        resolve({ data: null, error: `S3 upload failed: HTTP ${xhr.status} — ${xhr.responseText}` });
       }
     };
 
     xhr.onerror = () => {
-      resolve({ data: null, error: 'S3 upload failed: network error' });
+      // onerror fires when the browser blocks the request (e.g. CORS preflight rejection)
+      // xhr.responseText will be empty in this case — check the Network tab for the OPTIONS request
+      console.error('[uploadFileToS3] S3 upload failed (onerror — likely CORS preflight rejection)');
+      console.error('  Status:', xhr.status);
+      console.error('  Response:', xhr.responseText);
+      console.error('  Check the Network tab: look for a failing OPTIONS request to S3');
+      console.error('  Presigned URL:', presignedUrl);
+      console.error('  Fields sent:', JSON.stringify(fields));
+      resolve({ data: null, error: `S3 upload failed: network error — see console for details` });
     };
 
     xhr.send(formData);
