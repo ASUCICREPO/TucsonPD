@@ -1,6 +1,6 @@
 # Tucson PD - Automated Document Redaction System
 
-An AI-powered document redaction system for the Tucson Police Department that automatically identifies and applies redactions to scanned police documents based on configurable guidelines. The system uses Amazon Nova Pro for semantic analysis to determine what must be redacted.
+An AI-powered document redaction system for the Tucson Police Department that automatically identifies and applies redactions to scanned police documents based on configurable guidelines. The system uses Llama 4 for semantic analysis to determine what must be redacted.
 
 ## Disclaimers
 
