@@ -36,7 +36,7 @@ Field definitions:
     - "page": The page number being analyzed (integer)
     - "text": Exact verbatim text to redact as it appears in the OCR output
     - "instance": Occurrence number of this exact text on this page (1 = first, 2 = second, etc.)
-    - "rules": List of rule IDs from the guidelines justifying this redaction
+    - "rules": List of the 1-3 most relevant rule IDs from the guidelines justifying this redaction
     - "block_ids": List of word-level block IDs from the text map that should be redacted
 """
 
@@ -95,7 +95,8 @@ INSTRUCTIONS:
 
 1. Read through the entire text map carefully. Every line of text on the page is represented. Consider all text including headers, body text, table cells, form field values, and any other content.
 
-2. Apply each guideline rule to the text. Common categories of redactable information include but are not limited to:
+2. Apply each guideline rule to the text. Pay particular attention to VICTIM NAMES — these are the highest priority for redaction and must never be missed. Common categories of redactable information include but are not limited to:
+   - **Victim and witness names** (HIGHEST PRIORITY — always redact full names of victims, witnesses, and non-officer individuals mentioned in the report)
    - Personally Identifiable Information (PII): full names, dates of birth, Social Security Numbers, driver's license numbers, FBI numbers, SID numbers
    - Physical identifiers: height, weight, hair color, eye color, scars, tattoos, distinguishing marks
    - Contact information: home addresses, phone numbers, email addresses
@@ -110,7 +111,7 @@ INSTRUCTIONS:
    - Copy the text EXACTLY as it appears in the text map (preserve capitalization, spacing, punctuation)
    - Record which page it is on (always use {page_number})
    - Count the instance number: if the same text appears multiple times on this page, number each occurrence in order (1, 2, 3...)
-   - List ALL rule IDs that justify the redaction — this field is required, never omit it
+   - List the top 1-3 most relevant rule IDs that justify the redaction — choose only the rules that most directly apply. Do not list every tangentially related rule; pick the strongest justifications only. This field is required, never omit it.
    - List the word-level block IDs that correspond to the redactable text. Count carefully through the word IDs to select the correct ones.
 
 5. When in doubt, err on the side of redaction. It is better to over-redact than to under-redact.
@@ -121,6 +122,10 @@ INSTRUCTIONS:
    - Case numbers or report numbers
    - Dates of incidents or events (only redact dates of birth)
    - Names of businesses or organizations (unless they directly identify a protected individual)
+   - Department names, agency names, or logos (e.g. "Tucson Police Department", "TucsonPD", "TPD")
+   - Page titles, form titles, or section headers that are standard boilerplate (e.g. "INCIDENT REPORT", "SUPPLEMENTAL REPORT", "ARREST REPORT")
+   - Form field labels (e.g. "Name:", "DOB:", "Address:", "Victim:", "Suspect:") — only redact the VALUES, not the labels themselves
+   - Printed watermarks, footers, or page numbers
 
 7. Output ONLY a valid JSON array. No explanation, preamble, markdown formatting, or code fences. Your entire response must be parseable as JSON.
 

@@ -216,6 +216,9 @@ def extract_all_pages(
     """
     Extract text from all pages of a scanned PDF.
 
+    Opens the PDF once and processes all pages in a single pass, avoiding
+    the overhead of reopening the document for each page.
+
     Args:
         pdf_bytes: Raw PDF file bytes
         render_dpi: DPI used for page rendering
@@ -225,21 +228,107 @@ def extract_all_pages(
     """
     pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
     total_pages = len(pdf_document)
-    pdf_document.close()
 
     logger.info(f"Starting OCR extraction for {total_pages} pages at {render_dpi} DPI")
 
     page_maps = []
-    for page_num in range(1, total_pages + 1):
-        page_map = extract_text_from_page(pdf_bytes, page_num, render_dpi)
-        page_maps.append(page_map)
-        logger.info(
-            f"OCR complete for page {page_num}/{total_pages}: "
-            f"{len(page_map['text_blocks'])} words"
-        )
+    try:
+        for page_index in range(total_pages):
+            page_num = page_index + 1
+            page = pdf_document[page_index]
+
+            tp = page.get_textpage_ocr(dpi=render_dpi, full=True)
+            raw_words = page.get_text("words", textpage=tp)
+
+            if not raw_words:
+                logger.warning(f"Page {page_num}: OCR returned no words")
+                page_maps.append(_empty_page_result(page_num))
+                continue
+
+            # Build structured text blocks with IDs
+            text_blocks = []
+            lines_dict = {}
+
+            for word_tuple in raw_words:
+                x0, y0, x1, y1, text, block_idx, line_idx, word_idx = word_tuple
+
+                if not text.strip():
+                    continue
+
+                block_id = f"p{page_num}_b{block_idx}_l{line_idx}_w{word_idx}"
+                line_key = (block_idx, line_idx)
+                line_id = f"p{page_num}_b{block_idx}_l{line_idx}"
+
+                word_entry = {
+                    "block_id": block_id,
+                    "text": text.strip(),
+                    "bbox_pts": {
+                        "x0": round(x0, 2),
+                        "y0": round(y0, 2),
+                        "x1": round(x1, 2),
+                        "y1": round(y1, 2)
+                    },
+                    "block_index": block_idx,
+                    "line_index": line_idx,
+                    "word_index": word_idx
+                }
+
+                text_blocks.append(word_entry)
+
+                if line_key not in lines_dict:
+                    lines_dict[line_key] = {
+                        "line_id": line_id,
+                        "words": [],
+                        "word_ids": [],
+                        "bbox_pts": {
+                            "x0": round(x0, 2),
+                            "y0": round(y0, 2),
+                            "x1": round(x1, 2),
+                            "y1": round(y1, 2)
+                        }
+                    }
+
+                line_entry = lines_dict[line_key]
+                line_entry["words"].append(text.strip())
+                line_entry["word_ids"].append(block_id)
+
+                line_entry["bbox_pts"]["x0"] = round(
+                    min(line_entry["bbox_pts"]["x0"], x0), 2
+                )
+                line_entry["bbox_pts"]["y0"] = round(
+                    min(line_entry["bbox_pts"]["y0"], y0), 2
+                )
+                line_entry["bbox_pts"]["x1"] = round(
+                    max(line_entry["bbox_pts"]["x1"], x1), 2
+                )
+                line_entry["bbox_pts"]["y1"] = round(
+                    max(line_entry["bbox_pts"]["y1"], y1), 2
+                )
+
+            # Finalize lines
+            lines = []
+            for lk in sorted(lines_dict.keys()):
+                le = lines_dict[lk]
+                le["text"] = " ".join(le["words"])
+                del le["words"]
+                lines.append(le)
+
+            full_text = _build_full_text(lines, lines_dict)
+
+            page_maps.append({
+                "page_num": page_num,
+                "text_blocks": text_blocks,
+                "lines": lines,
+                "full_text": full_text
+            })
+
+            logger.info(f"OCR page {page_num}/{total_pages}: {len(text_blocks)} words")
+
+    finally:
+        pdf_document.close()
 
     total_words = sum(len(pm["text_blocks"]) for pm in page_maps)
-    logger.info(f"OCR extraction complete: {total_words} words across {total_pages} pages")
+    logger.info(f"OCR complete: {total_words} words across {total_pages} pages")
 
     return page_maps
 

@@ -193,7 +193,7 @@ class TucsonPdBackendStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler='lambda_function.lambda_handler',
             code=_lambda.Code.from_asset('./lambdas/database_management_lambda'),
-            timeout=Duration.seconds(30),
+            timeout=Duration.minutes(15),
             memory_size=512,
             environment={
                 'S3_BUCKET_NAME': redaction_bucket.bucket_name,

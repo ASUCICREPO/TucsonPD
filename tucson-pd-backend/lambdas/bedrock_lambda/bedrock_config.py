@@ -106,7 +106,7 @@ def get_prompt(type, page_text=None, guidelines=None, doc_summary=None, page_num
         KeyError: If required parameter is missing for prompt type
         AttributeError: If prompt module is not found
     """
-    logger.info(f"Getting prompt for type: {type}")
+    logger.debug(f"Getting prompt for type: {type}")
     
     try:
         prompt = ""
@@ -141,7 +141,6 @@ def get_prompt(type, page_text=None, guidelines=None, doc_summary=None, page_num
                 logger.warning(f"Unknown prompt type: {type}, using error prompt")
                 prompt = error.error_prompt
         
-        logger.info(f"Prompt retrieved successfully for type: {type}")
         return [
             {
                 "text": prompt
@@ -172,7 +171,7 @@ def get_config(type):
     Returns:
         Dictionary containing model configuration parameters
     """
-    logger.info(f"Getting config for type: {type}")
+    logger.debug(f"Getting config for type: {type}")
     
     try:
         config = {}
@@ -199,7 +198,6 @@ def get_config(type):
                     "maxTokens": default_max_tokens
                 }
         
-        logger.info(f"Config retrieved for type: {type}")
         return config
         
     except Exception as e:
@@ -218,7 +216,7 @@ def get_id(type):
     Returns:
         String containing the Bedrock model ID
     """
-    logger.info(f"Getting model ID for type: {type}")
+    logger.debug(f"Getting model ID for type: {type}")
     
     try:
         model_id = ""
@@ -233,7 +231,6 @@ def get_id(type):
                 logger.warning(f"Unknown model type: {type}, using error model")
                 model_id = error_id
         
-        logger.info(f"Model ID retrieved for type: {type}")
         return model_id
         
     except Exception as e:

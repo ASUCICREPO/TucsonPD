@@ -33,6 +33,7 @@ import base64
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Tuple, Optional
 import fitz  # PyMuPDF
 import boto3
@@ -66,6 +67,11 @@ logger.setLevel(logging.INFO)
 # DPI for page rendering — used for both image generation and OCR.
 # 150 is sufficient for clear printed scans; increase to 200 for degraded scans.
 PAGE_RENDER_DPI = 150
+
+# Maximum number of concurrent Nova API calls. Bedrock has per-model
+# throttling limits; 3–5 is safe for Nova Pro without hitting rate limits.
+# Increase if your account has higher provisioned throughput.
+MAX_NOVA_CONCURRENCY = 3
 
 
 def render_pdf_pages(pdf_bytes: bytes) -> List[Dict[str, Any]]:
@@ -515,8 +521,11 @@ def process_pages_for_redactions(
     entity_index: Dict[str, List[Dict[str, Any]]]
 ) -> List[Dict[str, Any]]:
     """
-    Process all pages sequentially: semantic analysis with Nova, then
-    bounding box resolution from OCR.
+    Process all pages with parallel Nova calls, then resolve bounding boxes.
+
+    Nova API calls are I/O-bound (network wait), so we use a thread pool to
+    run multiple pages concurrently. This is the biggest performance win —
+    a 15-page document goes from ~60s sequential to ~20s with 3 workers.
 
     Args:
         page_maps: List of OCR text maps from extract_all_pages
@@ -527,29 +536,64 @@ def process_pages_for_redactions(
     Returns:
         List of all redaction objects across all pages, with resolved bbox_pts
     """
-    all_redactions = []
     total_pages = len(page_maps)
+    logger.info(
+        f"Processing {total_pages} pages with up to "
+        f"{MAX_NOVA_CONCURRENCY} concurrent Nova calls"
+    )
 
+    # Step A: Run Nova semantic analysis in parallel
+    nova_results = {}  # page_num -> list of nova decisions
+
+    def _analyze_page(page_map):
+        """Worker function for thread pool."""
+        return (
+            page_map["page_num"],
+            analyze_page_with_nova(
+                page_map=page_map,
+                guidelines_json=guidelines_json,
+                document_summary=document_summary,
+                entity_index=entity_index
+            )
+        )
+
+    with ThreadPoolExecutor(max_workers=MAX_NOVA_CONCURRENCY) as executor:
+        futures = {
+            executor.submit(_analyze_page, pm): pm["page_num"]
+            for pm in page_maps
+        }
+
+        for future in as_completed(futures):
+            page_num = futures[future]
+            try:
+                result_page_num, decisions = future.result()
+                nova_results[result_page_num] = decisions
+                logger.info(
+                    f"Page {result_page_num}/{total_pages}: "
+                    f"{len(decisions)} semantic decisions"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Page {page_num}: Nova analysis failed: {e}",
+                    exc_info=True
+                )
+                nova_results[page_num] = []
+
+    # Step B: Resolve bounding boxes sequentially (fast, CPU-only)
+    all_redactions = []
     for page_map in page_maps:
         page_num = page_map["page_num"]
-        logger.info(f"Processing page {page_num}/{total_pages}")
+        decisions = nova_results.get(page_num, [])
 
-        # Step A: Nova identifies WHAT to redact (semantic)
-        nova_decisions = analyze_page_with_nova(
-            page_map=page_map,
-            guidelines_json=guidelines_json,
-            document_summary=document_summary,
-            entity_index=entity_index
-        )
+        if not decisions:
+            continue
 
-        # Step B: Resolve WHERE to redact from OCR (spatial)
-        resolved_redactions = resolve_bounding_boxes(nova_decisions, page_map)
-
+        resolved = resolve_bounding_boxes(decisions, page_map)
         logger.info(
-            f"Page {page_num}: {len(nova_decisions)} semantic decisions → "
-            f"{len(resolved_redactions)} resolved redactions"
+            f"Page {page_num}: {len(decisions)} decisions → "
+            f"{len(resolved)} resolved"
         )
-        all_redactions.extend(resolved_redactions)
+        all_redactions.extend(resolved)
 
     return all_redactions
 
