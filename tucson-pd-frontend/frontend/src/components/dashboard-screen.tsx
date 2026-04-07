@@ -363,15 +363,13 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
               <h2 className="text-slate-900 mb-1">Dashboard</h2>
               <p className="text-slate-600">Manage and monitor records processing requests</p>
             </div>
-            {myCases.length > 0 && (
-              <button
-                onClick={onStartNewCase}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <PlusCircle className="w-5 h-5" />
-                New Case
-              </button>
-            )}
+            <button
+              onClick={onStartNewCase}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <PlusCircle className="w-5 h-5" />
+              New Case
+            </button>
           </div>
 
           {/* Metrics Summary */}
@@ -879,8 +877,17 @@ export function DashboardScreen({ onStartNewCase, onViewCase, currentUserEmail, 
                 {sortedCases.length === 0 && (
                   <div className="py-12 text-center">
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600 mb-2">No cases found</p>
-                    <p className="text-slate-500">Try adjusting your search criteria</p>
+                    {activeTab === 'my' && myCases.length === 0 ? (
+                      <>
+                        <p className="text-slate-600 mb-2">You haven't created any cases yet</p>
+                        <p className="text-slate-500">Click "New Case" above to get started</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-slate-600 mb-2">No cases found</p>
+                        <p className="text-slate-500">Try adjusting your search criteria</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
