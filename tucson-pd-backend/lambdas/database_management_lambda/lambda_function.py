@@ -275,14 +275,14 @@ def handle_create_case(officer_id: str, officer_name: str) -> Dict[str, Any]:
 
 
 def handle_get_case(case_id: str, officer_id: str) -> Dict[str, Any]:
-    """Handle GET /cases/{case_id} - Get case details"""
+    """Handle GET /cases/{case_id} - Get case details.
+
+    No ownership check — officers can view each other's work. Case ownership
+    (the `officer_id` field on the record) is left intact.
+    """
     logger.info(f"Getting case: {case_id}")
 
     case = get_case(case_id)
-
-    # Verify officer owns this case (security check)
-    if case['officer_id'] != officer_id:
-        raise PermissionError("You do not have permission to access this case")
 
     return build_api_response(200, {
         "success": True,
@@ -304,7 +304,12 @@ def handle_list_cases(officer_id: str, status_filter: str, limit: int, exclude_o
 
 
 def handle_update_status(case_id: str, body: Dict[str, Any], officer_id: str) -> Dict[str, Any]:
-    """Handle PUT /cases/{case_id}/status - Update case status"""
+    """Handle PUT /cases/{case_id}/status - Update case status.
+
+    No ownership check — any officer can advance another officer's case
+    through the review workflow. The case's `officer_id` is untouched by
+    `update_case_status`, so ownership stays attached to the original officer.
+    """
     logger.info(f"Updating status for case: {case_id}")
 
     # Validate request body
@@ -314,12 +319,8 @@ def handle_update_status(case_id: str, body: Dict[str, Any], officer_id: str) ->
     new_status = body['status']
     metadata = body.get('metadata', {})
 
-    # Verify officer owns this case
-    case = get_case(case_id)
-    if case['officer_id'] != officer_id:
-        raise PermissionError("You do not have permission to update this case")
-
-    # Update status (this may trigger Bedrock Lambda)
+    # Update status (this may trigger Bedrock Lambda). Existence of the case
+    # is verified inside update_case_status via its own get_case() call.
     updated_case = update_case_status(case_id, new_status, metadata)
 
     return build_api_response(200, {
@@ -330,7 +331,12 @@ def handle_update_status(case_id: str, body: Dict[str, Any], officer_id: str) ->
 
 
 def handle_update_s3_path(case_id: str, body: Dict[str, Any], officer_id: str) -> Dict[str, Any]:
-    """Handle PUT /cases/{case_id}/s3-path - Update S3 path"""
+    """Handle PUT /cases/{case_id}/s3-path - Update S3 path.
+
+    No ownership check — officers can record uploads against another officer's
+    case. `update_case_s3_path` only writes `s3_paths.{path_type}` and
+    `updated_at`, so the case's owning `officer_id` stays intact.
+    """
     logger.info(f"Updating S3 path for case: {case_id}")
 
     # Validate request body
@@ -340,12 +346,8 @@ def handle_update_s3_path(case_id: str, body: Dict[str, Any], officer_id: str) -
     path_type = body['path_type']
     s3_path = body['s3_path']
 
-    # Verify officer owns this case
-    case = get_case(case_id)
-    if case['officer_id'] != officer_id:
-        raise PermissionError("You do not have permission to update this case")
-
-    # Update S3 path
+    # Update S3 path. Existence of the case is verified inside
+    # update_case_s3_path via its own get_case() call.
     updated_case = update_case_s3_path(case_id, path_type, s3_path)
 
     return build_api_response(200, {
@@ -356,7 +358,11 @@ def handle_update_s3_path(case_id: str, body: Dict[str, Any], officer_id: str) -
 
 
 def handle_generate_upload_url(body: Dict[str, Any], officer_id: str) -> Dict[str, Any]:
-    """Handle POST /presigned-url/upload - Generate upload URL"""
+    """Handle POST /presigned-url/upload - Generate upload URL.
+
+    No ownership check — officers can upload to each other's cases. Matches
+    the existing pattern used by `handle_generate_download_url`.
+    """
     logger.info("Generating pre-signed upload URL")
 
     # Validate request body
@@ -366,10 +372,8 @@ def handle_generate_upload_url(body: Dict[str, Any], officer_id: str) -> Dict[st
     case_id = body['case_id']
     file_type = body['file_type']
 
-    # Verify officer owns this case
-    case = get_case(case_id)
-    if case['officer_id'] != officer_id:
-        raise PermissionError("You do not have permission to upload to this case")
+    # Verify case exists (no ownership check — officers can upload to each other's work)
+    get_case(case_id)
 
     # Generate pre-signed URL
     url_data = generate_upload_url(case_id, file_type)
@@ -406,13 +410,12 @@ def handle_generate_download_url(body: Dict[str, Any], officer_id: str) -> Dict[
 
 
 def handle_delete_case(case_id: str, officer_id: str) -> Dict[str, Any]:
-    """Handle DELETE /cases/{case_id} - Delete case"""
-    logger.info(f"Deleting case: {case_id}")
+    """Handle DELETE /cases/{case_id} - Delete case.
 
-    # Verify officer owns this case
-    case = get_case(case_id)
-    if case['officer_id'] != officer_id:
-        raise PermissionError("You do not have permission to delete this case")
+    No ownership check — any officer can delete any case. Existence of the
+    case is verified inside `delete_case` via its own get_case() call.
+    """
+    logger.info(f"Deleting case: {case_id}")
 
     # Delete the case
     delete_case(case_id)
