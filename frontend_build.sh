@@ -139,6 +139,8 @@ main() {
     print_substep "Constants file updated successfully"
     
     # Step 2: Install dependencies
+    # Use /tmp for node_modules and npm cache to avoid filling small home partitions (CloudShell)
+    # CloudShell home directory is only ~1GB but /tmp has much more space
     print_substep "Installing npm dependencies..."
     
     cd "$FRONTEND_DIR" || {
@@ -146,7 +148,13 @@ main() {
         rollback
     }
     
-    if ! npm install; then
+    # Symlink node_modules to /tmp if home space is tight
+    if [ -d "/tmp" ] && [ ! -d "node_modules" ]; then
+        mkdir -p /tmp/tucsonpd_node_modules
+        ln -sf /tmp/tucsonpd_node_modules node_modules 2>/dev/null || true
+    fi
+    
+    if ! npm install --cache /tmp/.npm-cache; then
         print_error "npm install failed"
         cd "$ORIGINAL_DIR"
         rollback
