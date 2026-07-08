@@ -602,8 +602,23 @@ main() {
                 exit 1
             fi
             
+            # Free disk space: remove Python venv (no longer needed until frontend CDK deploy)
+            # This is critical for CloudShell which has limited home directory storage (~1GB)
+            print_substep "Freeing disk space for frontend build..."
+            rm -rf "$BACKEND_DIR/.venv" 2>/dev/null || true
+            pip3 cache purge 2>/dev/null || true
+            npm cache clean --force 2>/dev/null || true
+            
             # Stage 2: Build frontend
             build_frontend "$REST_API_URL"
+            
+            # Free disk space again: remove node_modules after build.zip is created
+            print_substep "Freeing disk space for frontend deploy..."
+            rm -rf "$FRONTEND_DIR/frontend/node_modules" 2>/dev/null || true
+            npm cache clean --force 2>/dev/null || true
+            
+            # Recreate Python venv for frontend CDK deploy
+            setup_python_venv
             
             # Stage 3: Deploy frontend
             deploy_frontend
