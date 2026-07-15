@@ -204,7 +204,10 @@ Ensure you have access to the Nova Pro LLM model in your AWS account and permiss
 
 **Network Configuration**:
 - Default VPC available in your AWS region
-- If default VPC doesn't exist, create using: [AWS VPC Documentation](https://docs.aws.amazon.com/cli/latest/reference/ec2/create-default-vpc.html)
+- If default VPC doesn't exist, open **CloudShell** in the AWS Console and run:
+  ```bash
+  aws ec2 create-default-vpc --region us-west-2
+  ```
 
 ### EC2 Instance Setup
 
@@ -218,12 +221,21 @@ Ensure you have access to the Nova Pro LLM model in your AWS account and permiss
    - Configure instance settings:
      - Name: "TucsonPD-Deployment"
      - AMI: Amazon Linux 2023
-     - Instance type: t2.micro (or larger)
-     - Use default VPC configuration
+     - Instance type: t3.medium (or larger)
+     - Key pair: Proceed without a key pair
+     - Network: Select the default VPC, any subnet, **Auto-assign public IP: Enable**
+     - Security group: Allow SSH (port 22) from 0.0.0.0/0
    - Click "Launch Instance"
    - Wait for instance to reach "running" state
 
-3. **Connect to Instance**
+3. **Attach IAM Role**
+   - Go to **EC2 → Instances** in the console
+   - Select your instance
+   - Click **Actions → Security → Modify IAM role**
+   - Select a role with **AdministratorAccess** (or create one: IAM → Roles → Create role → AWS service → EC2 → attach AdministratorAccess policy)
+   - Click **Update IAM role**
+
+4. **Connect to Instance**
    - Navigate to the Instances page
    - Select your created instance
    - Click "Connect"
@@ -244,12 +256,13 @@ Execute the following commands in your EC2 terminal:
 
 2. **Install AWS CDK**
    ```bash
-   npm install -g aws-cdk
+   sudo npm install -g aws-cdk
    ```
 
-3. **Install Python dependencies**
+3. **Install Python pip and dependencies**
    ```bash
-   pip install aws-cdk-lib constructs
+   sudo yum install -y python3-pip
+   pip3 install aws-cdk-lib constructs
    ```
 
 4. **Verify Installations**
